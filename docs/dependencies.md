@@ -49,6 +49,7 @@ Debian 13), used under Apache-2.0 (cloud-init is dual-licensed GPL-3 / Apache-2.
 | vue-router | Routing between list (UI-02) and editor (UI-01) | MIT | Vue.js team |
 | vuetify | Component library with light/dark themes (section 7.2, FR-016) | MIT | Vuetify LLC |
 | @lucide/vue | Icons | ISC | Lucide (lucide-icons organization) |
+| @fontsource-variable/inter | Font Inter, bundled with the frontend instead of loaded from a CDN (section 7.2, NFR-012) | OFL-1.1 (font), MIT (package) | Fontsource |
 | @codemirror/state, view, commands, language, lint | Code editor with line numbers and error markers (FR-008, FR-013, FR-014) | MIT | CodeMirror (Marijn Haverbeke, Adrian Heine) |
 | @codemirror/lang-yaml, lang-json, legacy-modes | Syntax highlighting for YAML, JSON, shell, ini/conf, TOML, Python (FR-008) | MIT | CodeMirror |
 | @codemirror/theme-one-dark | Dark editor theme (FR-016) | MIT | CodeMirror |

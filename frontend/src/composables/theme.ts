@@ -1,16 +1,16 @@
-// FR-016: light/dark theme, light by default, remembered in local storage.
+// FR-016: light/dark theme, dark by default (v0.23), remembered in local storage.
 import { useTheme } from 'vuetify'
 
 export type ThemeName = 'light' | 'dark'
 
 export const THEME_STORAGE_KEY = 'cnc-theme'
 
-/** The stored theme; light if nothing (or something invalid) is stored. */
+/** The stored theme; dark if nothing (or something invalid) is stored. */
 export function storedTheme(): ThemeName {
   try {
-    return localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light'
+    return localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark'
   } catch {
-    return 'light'
+    return 'dark'
   }
 }
 

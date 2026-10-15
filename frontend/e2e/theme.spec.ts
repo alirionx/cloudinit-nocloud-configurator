@@ -2,41 +2,41 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import { createConfiguration, uniqueName } from './helpers'
 
-const LIGHT_BG = 'rgb(255, 255, 255)'
-const DARK_BG = 'rgb(18, 18, 18)'
+const LIGHT_BG = 'rgb(245, 246, 248)'
+const DARK_BG = 'rgb(14, 15, 18)'
 
-test('FR-016: light theme is active on the first visit', async ({ page }) => {
+test('FR-016: dark theme is active on the first visit', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
-  await expect(page.locator('.v-application')).toHaveClass(/v-theme--light/)
-  await expect(page.getByRole('button', { name: 'Switch to dark theme' })).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await expect(page.locator('.v-application')).toHaveClass(/v-theme--dark/)
+  await expect(page.getByRole('button', { name: 'Switch to light theme' })).toBeVisible()
 })
 
-test('FR-016: dark theme is remembered and applied before the first render', async ({ page }) => {
+test('FR-016: light theme is remembered and applied before the first render', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Switch to dark theme' }).click()
-  await expect(page.locator('.v-application')).toHaveClass(/v-theme--dark/)
-
-  await page.reload()
-  await expect(page.locator('.v-application')).toHaveClass(/v-theme--dark/)
-
-  // Without the app bundle nothing is rendered by Vue: the page must already be dark,
-  // which proves there is no light flash before the app starts.
-  await page.route('**/assets/*.js', (route) => route.abort())
-  await page.goto('/')
-  const background = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor)
-  expect(background).toBe(DARK_BG)
-})
-
-test('FR-016: switching back to light is remembered too', async ({ page }) => {
-  await page.goto('/')
-  await page.evaluate(() => localStorage.setItem('cnc-theme', 'dark'))
-  await page.reload()
   await page.getByRole('button', { name: 'Switch to light theme' }).click()
-  await page.route('**/assets/*.js', (route) => route.abort())
+  await expect(page.locator('.v-application')).toHaveClass(/v-theme--light/)
+
   await page.reload()
+  await expect(page.locator('.v-application')).toHaveClass(/v-theme--light/)
+
+  // Without the app bundle nothing is rendered by Vue: the page must already be light,
+  // which proves there is no dark flash before the app starts.
+  await page.route('**/assets/*.js', (route) => route.abort())
+  await page.goto('/')
   const background = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor)
   expect(background).toBe(LIGHT_BG)
+})
+
+test('FR-016: switching back to dark is remembered too', async ({ page }) => {
+  await page.goto('/')
+  await page.evaluate(() => localStorage.setItem('cnc-theme', 'light'))
+  await page.reload()
+  await page.getByRole('button', { name: 'Switch to dark theme' }).click()
+  await page.route('**/assets/*.js', (route) => route.abort())
+  await page.reload()
+  const background = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor)
+  expect(background).toBe(DARK_BG)
 })
 
 for (const theme of ['light', 'dark'] as const) {

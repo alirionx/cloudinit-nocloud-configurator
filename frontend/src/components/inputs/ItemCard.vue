@@ -7,7 +7,7 @@ const emit = defineEmits<{ move: [to: number]; duplicate: []; remove: [] }>()
 </script>
 
 <template>
-  <v-card variant="outlined" class="mb-3 item-card">
+  <v-card border flat class="mb-3 item-card">
     <div class="d-flex align-center px-3 py-1 item-header">
       <slot name="handle" />
       <span class="text-subtitle-2 text-truncate">{{ title }}</span>

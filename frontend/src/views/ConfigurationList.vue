@@ -99,9 +99,14 @@ async function confirmDelete() {
 </script>
 
 <template>
-  <v-container class="pa-4" style="max-width: 1200px">
-    <div class="d-flex align-center flex-wrap ga-3 mb-4">
-      <h1 class="text-h5">Configurations</h1>
+  <v-container class="page">
+    <div class="d-flex align-center flex-wrap ga-3 mb-6">
+      <div>
+        <h1 class="page-title">Configurations</h1>
+        <p class="text-body-2 text-medium-emphasis mt-1">
+          {{ items.length }} saved {{ items.length === 1 ? 'configuration' : 'configurations' }} · NoCloud seed drives
+        </p>
+      </div>
       <v-spacer />
       <v-text-field
         v-model="search"
@@ -111,11 +116,14 @@ async function confirmDelete() {
         clearable
         style="max-width: 22rem"
       />
-      <v-btn color="primary" :prepend-icon="Plus" to="/configurations/new">New configuration</v-btn>
+      <v-btn color="primary" variant="flat" size="large" :prepend-icon="Plus" to="/configurations/new">
+        New configuration
+      </v-btn>
     </div>
 
     <v-alert v-if="loadError" type="error" variant="tonal" class="mb-4">{{ loadError }}</v-alert>
 
+    <v-card class="table-card" border>
     <v-data-table
       :headers="headers"
       :items="items"
@@ -138,18 +146,19 @@ async function confirmDelete() {
       <template #[`item.actions`]="{ item }">
         <div class="d-flex justify-end" @click.stop>
           <v-btn :icon="Pencil" variant="text" size="small" :aria-label="`Rename ${item.name}`" @click="startRename(item)" />
-          <v-btn :icon="Copy" variant="text" size="small" :aria-label="`Duplicate ${item.name}`" @click="duplicate(item)" />
+          <v-btn :icon="Copy" variant="text" size="small" color="primary" :aria-label="`Duplicate ${item.name}`" @click="duplicate(item)" />
           <v-btn
             :icon="Trash2"
             variant="text"
             size="small"
-            color="error"
+            color="secondary"
             :aria-label="`Delete ${item.name}`"
             @click="deleting = item"
           />
         </div>
       </template>
     </v-data-table>
+    </v-card>
 
     <v-dialog :model-value="!!renaming" max-width="460" @update:model-value="renaming = null">
       <v-card title="Rename configuration">
@@ -190,10 +199,26 @@ async function confirmDelete() {
 </template>
 
 <style scoped>
+.page {
+  max-width: 1200px;
+  padding: 40px 32px;
+}
+.table-card {
+  background: rgb(var(--v-theme-surface));
+}
+.table-card :deep(.v-table) {
+  background: transparent;
+}
+.table-card :deep(th) {
+  font-size: 0.75rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600 !important;
+}
 .name-link {
   color: rgb(var(--v-theme-primary));
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
 }
 .name-link:hover {
   text-decoration: underline;

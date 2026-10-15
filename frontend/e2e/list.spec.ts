@@ -73,7 +73,7 @@ test('FR-015: renaming directly in the list', async ({ page, request }) => {
 
 test('UI-02: a new configuration is started from the list', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('link', { name: 'New configuration' }).click()
+  await page.getByRole('main').getByRole('link', { name: 'New configuration' }).click()
   await expect(page).toHaveURL(/\/configurations\/new$/)
   await expect(page.getByLabel('Configuration name')).toHaveValue('New configuration')
 })

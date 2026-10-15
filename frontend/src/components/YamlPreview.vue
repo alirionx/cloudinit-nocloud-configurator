@@ -96,7 +96,7 @@ defineExpose({ editText })
 </script>
 
 <template>
-  <v-card variant="outlined" class="yaml-preview">
+  <v-card border class="yaml-preview" title="Preview" subtitle="Generated NoCloud files">
     <div class="d-flex align-center flex-wrap">
       <v-tabs v-model="active" density="compact" color="primary">
         <v-tab

@@ -1,7 +1,7 @@
 # Requirements Specification: cloudinit-nocloud-configurator
 
 > **Status:** MVP implemented (steps 1–8)
-> **Version:** 0.22
+> **Version:** 0.23
 > **Last updated:** 2026-10-15
 > **Owner:** Daniel Quilitzsch
 
@@ -26,6 +26,7 @@
 | 0.13    | 2026-10-15 | App name set: cloudinit-nocloud-configurator | Claude |
 | 0.14    | 2026-10-15 | OQ-09 decided: Debian as target OS of the VMs; FR-007, FR-010, assumptions and R-06 updated | Claude |
 | 0.15    | 2026-10-15 | Problem statement (1.2) refined; NFR-015/NFR-016 on established, actively maintained open-source libraries added (criteria in 8.5); R-08 added; `genisoimage` removed | Claude |
+| 0.23    | 2026-10-15 | FR-016 changed by the product owner: dark theme is the default; visual refresh (sidebar navigation, teal/salmon accents, rounded cards, font Inter) in 7.2 | Daniel Quilitzsch |
 | 0.22    | 2026-10-15 | DEP-009 (Helm chart as GitHub release artifact, version from `Chart.yaml`, image tag `main`) and DEP-010 (container image on ghcr.io, already implemented) added; R-10 added | Claude |
 | 0.21    | 2026-10-15 | Step 8: Helm chart and generated manifests implemented (DEP-001 to DEP-008); verified in a kind cluster (`scripts/kind-test.sh`) | Claude |
 | 0.20    | 2026-10-15 | DEP-003 changed by the product owner: bundled CouchDB as own StatefulSet (1 replica, PVC) instead of the Apache CouchDB subchart; generated credentials stable across upgrades. Chart default image `ghcr.io/alirionx/cloudinit-nocloud-configurator:main` (pullPolicy Always) | Daniel Quilitzsch |
@@ -356,12 +357,12 @@ The following is explicitly **not** part of the current version:
 - **Status:** Implemented (v0.17)
 - **User story:** As an administrator, I want to switch between a light and a dark theme so that I can work comfortably in different environments.
 - **Description:**
-  - A toggle in the header switches between **light** and **dark**. **Light is the default.**
+  - A toggle in the navigation switches between **light** and **dark**. **Dark is the default** (changed in v0.23, previously light).
   - The choice is remembered in the browser (local storage) and applied on the next visit before the first render (no flicker).
   - All components, including code editors and the YAML preview, follow the theme.
 - **Acceptance criteria:**
-  - [x] Given a first visit, when the app loads, then the light theme is active.
-  - [x] Given I switched to dark, when I reload the page, then the dark theme is active without a visible light flash.
+  - [x] Given a first visit, when the app loads, then the dark theme is active.
+  - [x] Given I switched to light, when I reload the page, then the light theme is active without a visible dark flash.
   - [x] Given either theme, when I check text and controls, then contrast meets WCAG 2.1 AA (NFR-013).
 - **Dependencies:** –
 
@@ -412,7 +413,8 @@ _Generated images are not a persistent entity; they are created on every downloa
 | UI-02 | Configuration list | Start page: list of saved configurations with search, sorting and actions (new, open, rename, duplicate, delete) | FR-015 |
 
 ### 7.2 Design Guidelines
-- Light and dark theme with a toggle in the header; light is the default (FR-016).
+- Light and dark theme with a toggle in the navigation; **dark is the default** (FR-016, v0.23).
+- Visual style (v0.23): permanent navigation sidebar with logo, near-black dark background, mint/teal accent with salmon as secondary color, rounded cards and pill-shaped buttons, bundled font Inter (no CDN, NFR-012).
 - Clean, technical look with a consistent component library for Vue 3 (chosen according to section 8.5): **Vuetify** (v0.17; PrimeVue was rejected because it is no longer OSI-licensed since version 5, LIB-001). Code editors: CodeMirror 6.
 - Code editors and the YAML preview use a monospace font and syntax highlighting matching the active theme.
 

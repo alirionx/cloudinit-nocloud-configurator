@@ -1,7 +1,21 @@
 <script setup lang="ts">
 // UI-01: configuration editor. Collapsible form sections on top, live YAML preview below
 // (FR-004, FR-013), explicit save (FR-015) and image download (FR-002, FR-003).
-import { ArrowLeft, Download, RotateCcw, Save } from '@lucide/vue'
+import {
+  Braces,
+  ChevronLeft,
+  Download,
+  FileText,
+  HardDrive,
+  KeyRound,
+  Network as NetworkIcon,
+  Package,
+  RotateCcw,
+  Save,
+  Server,
+  SquareTerminal,
+  Users as UsersIcon,
+} from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError, type ImageFormat, api } from '../api/client'
@@ -286,18 +300,19 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
 </script>
 
 <template>
-  <v-container fluid class="editor pa-4">
+  <v-container fluid class="editor">
     <v-alert v-if="loadError" type="error" variant="tonal">
       {{ loadError }}
       <template #append><v-btn to="/" variant="text">Back to list</v-btn></template>
     </v-alert>
 
     <template v-else-if="form">
-      <div class="d-flex align-center flex-wrap ga-2 mb-4">
-        <v-btn :icon="ArrowLeft" variant="text" to="/" aria-label="Back to the list" />
+      <div class="editor-header d-flex align-center flex-wrap ga-3 mb-6">
+        <v-btn :icon="ChevronLeft" variant="tonal" to="/" aria-label="Back to the list" />
         <v-text-field
           v-model="form.name"
           label="Configuration name"
+          variant="plain"
           class="name-field"
           hide-details="auto"
           v-bind="nameField"
@@ -307,12 +322,19 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
         <v-btn v-if="dirty && stored" variant="text" :prepend-icon="RotateCcw" @click="revertPrompt = true">
           Revert to saved
         </v-btn>
-        <v-btn color="primary" :prepend-icon="Save" :loading="saving" :disabled="!dirty && !isNew" @click="save">
+        <v-btn
+          color="primary"
+          variant="flat"
+          :prepend-icon="Save"
+          :loading="saving"
+          :disabled="!dirty && !isNew"
+          @click="save"
+        >
           Save
         </v-btn>
         <v-menu>
           <template #activator="{ props: menuProps }">
-            <v-btn v-bind="menuProps" variant="tonal" :prepend-icon="Download" append-icon="$dropdown">
+            <v-btn v-bind="menuProps" color="secondary" variant="flat" :prepend-icon="Download" append-icon="$dropdown">
               Download
             </v-btn>
           </template>
@@ -334,13 +356,13 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
       <v-expansion-panels
         v-model="openSections"
         multiple
-        variant="accordion"
-        class="mb-4"
+        class="sections mb-6"
         :class="{ locked: !!editingFile }"
         :inert="!!editingFile"
       >
         <SectionPanel
           value="basics"
+          :icon="Server"
           title="Basics"
           :summary="summaries.basics"
           help="Hostname, instance ID, timezone and locale. The instance ID tells cloud-init whether this is a new instance."
@@ -356,6 +378,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
         </SectionPanel>
         <SectionPanel
           value="network"
+          :icon="NetworkIcon"
           title="Network"
           :summary="summaries.network"
           help="Network interfaces and bridges, written to network-config in Netplan version 2 format."
@@ -367,6 +390,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
         </SectionPanel>
         <SectionPanel
           value="packages"
+          :icon="Package"
           title="Packages"
           :summary="summaries.packages"
           help="Refresh package sources, upgrade the system and install additional Debian packages on first boot."
@@ -378,6 +402,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
         </SectionPanel>
         <SectionPanel
           value="write_files"
+          :icon="FileText"
           title="Files"
           :summary="summaries.write_files"
           help="Files created on the VM. Use 'defer' for files owned by users that cloud-init creates."
@@ -389,6 +414,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
         </SectionPanel>
         <SectionPanel
           value="commands"
+          :icon="SquareTerminal"
           title="Commands"
           :summary="summaries.commands"
           help="Commands run at boot: runcmd once at the end of the first boot, bootcmd early on every boot."
@@ -400,6 +426,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
         </SectionPanel>
         <SectionPanel
           value="users"
+          :icon="UsersIcon"
           title="Users and groups"
           :summary="summaries.users"
           help="User accounts with groups, sudo rules, passwords and SSH keys. Passwords are stored only as hashes."
@@ -411,6 +438,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
         </SectionPanel>
         <SectionPanel
           value="ssh"
+          :icon="KeyRound"
           title="SSH"
           :summary="summaries.ssh"
           help="SSH access. Secure defaults: no password login, no root login."
@@ -422,6 +450,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
         </SectionPanel>
         <SectionPanel
           value="disks"
+          :icon="HardDrive"
           title="Disks"
           :summary="summaries.disks"
           help="Partition, format and mount additional disks (disk_setup, fs_setup, mounts)."
@@ -433,6 +462,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
         </SectionPanel>
         <SectionPanel
           value="additional"
+          :icon="Braces"
           title="Additional settings (YAML only)"
           :summary="summaries.additional"
           help="Settings the form does not cover, e.g. further cloud-init modules or bonds and VLANs. They are kept unchanged and can only be edited with 'Edit as YAML' in the preview."
@@ -542,13 +572,36 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
 
 <style scoped>
 .editor {
-  max-width: 1400px;
+  max-width: 1320px;
+  padding: 32px;
+}
+/* Sections as separate rounded cards. */
+.sections {
+  gap: 12px;
+}
+.sections :deep(.v-expansion-panel) {
+  border-radius: 14px !important;
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  margin-top: 0 !important;
+}
+.sections :deep(.v-expansion-panel::after),
+.sections :deep(.v-expansion-panel__shadow) {
+  display: none;
+}
+.sections :deep(.v-expansion-panel-title) {
+  min-height: 60px;
 }
 .locked {
   opacity: 0.6;
 }
 .name-field {
-  max-width: 28rem;
+  max-width: 34rem;
   min-width: 16rem;
+}
+.name-field :deep(input) {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 </style>
