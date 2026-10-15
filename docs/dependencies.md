@@ -16,6 +16,7 @@ Review this list for every release.
 | anyio | Runs blocking TinyDB calls in worker threads; async test support | MIT | agronholm / community |
 | tinydb | Datastore backend for development and single instances (section 8.3) | MIT | msiemens (see exceptions) |
 | pyyaml | Rendering the NoCloud YAML files (FR-001, FR-004) | MIT | YAML organization |
+| jsonschema | Validation against the cloud-init JSON schemas (NFR-008, FR-014) | MIT | python-jsonschema organization |
 | httpx2 | Async HTTP client for the CouchDB API; also used by FastAPI's `TestClient` (successor of `httpx` recommended by Starlette) | BSD-3-Clause | Pydantic organization |
 
 Notable transitive dependencies: `pydantic` (MIT), `starlette` (BSD-3-Clause).
@@ -27,6 +28,10 @@ PyYAML: last release 6.0.3 (2025-09); LIB-002 is met through ongoing commits, in
 security fix (DoS via merge keys, 2026-06) that is not released yet. Relevant once user YAML is
 parsed (FR-014): limit the input size there. `ruamel.yaml` was not chosen: effectively a single
 maintainer (LIB-003).
+
+Vendored data: the cloud-init JSON schemas in `backend/app/schemas/` (cloud-init 25.1.4 from
+Debian 13), used under Apache-2.0 (cloud-init is dual-licensed GPL-3 / Apache-2.0); see
+`backend/app/schemas/NOTICE.md`.
 
 ## Python development
 
@@ -84,6 +89,8 @@ distributed with the application.
 | `python:3.13-alpine` | Runtime base image | PSF-2.0 (Python), MIT (Alpine base) | Docker Official Images |
 | `node:24-alpine` | Frontend build stage only, not in the final image | MIT | Docker Official Images |
 | openssl | SHA-512-crypt password hashing via `openssl passwd -6` (FR-010) | Apache-2.0 | Alpine repository (OpenSSL project) |
+| `debian:stable` | Tests only: manual validation with the `cloud-init schema` CLI | Various (DFSG) | Docker Official Images |
+| Debian 13 genericcloud image, QEMU, OVMF | Tests only: `scripts/boot-test.sh` (FR-002); not part of the app | Various (DFSG), GPL-2.0, BSD-2-Clause-Patent | Debian, QEMU, TianoCore |
 | `couchdb:3` | Tests only: contract tests and smoke test (DS-007); not part of the app image | Apache-2.0 | Docker Official Images (Apache CouchDB) |
 | xorriso | ISO 9660 seed image (FR-002) | GPL-3.0-or-later | Alpine repository (GNU xorriso) |
 | dosfstools | `mkfs.vfat` for RAW seed images (FR-002) | GPL-3.0-or-later | Alpine repository |

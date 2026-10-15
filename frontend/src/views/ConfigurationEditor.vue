@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // UI-01: configuration editor. Collapsible form sections on top, live YAML preview below
 // (FR-004, FR-013), explicit save (FR-015) and image download (FR-002, FR-003).
-import { ArrowLeft, Download, Save } from '@lucide/vue'
+import { ArrowLeft, Download, RotateCcw, Save } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError, type ImageFormat, api } from '../api/client'
-import type { Configuration, ItemTemplates, StoredConfiguration } from '../api/types'
+import type { Configuration, FileName, ItemTemplates, StoredConfiguration, YamlError } from '../api/types'
 import SectionPanel from '../components/SectionPanel.vue'
 import YamlPreview from '../components/YamlPreview.vue'
+import AdditionalSection from '../components/sections/AdditionalSection.vue'
 import BasicsSection from '../components/sections/BasicsSection.vue'
 import CommandsSection from '../components/sections/CommandsSection.vue'
 import DisksSection from '../components/sections/DisksSection.vue'
@@ -19,7 +20,7 @@ import UsersSection from '../components/sections/UsersSection.vue'
 import { createIssueState, provideIssues, useField } from '../composables/issues'
 import { usePreview } from '../composables/preview'
 import { useUnsavedGuard } from '../composables/unsavedGuard'
-import { clone, provideTemplates, randomSuffix, suggestInstanceId, toConfiguration } from '../form'
+import { clone, provideTemplates, randomSuffix, suggestInstanceId, toConfiguration, yamlOnlyKeys } from '../form'
 
 const DOCS = 'https://docs.cloud-init.io/en/latest/reference'
 
@@ -34,6 +35,16 @@ const saving = ref(false)
 const message = ref<{ text: string; color: string } | null>(null)
 const conflict = ref(false)
 const downloadPrompt = ref<ImageFormat | null>(null)
+/** Download waiting for confirmation because of cloud-init schema hints (FR-014). */
+const schemaPrompt = ref<ImageFormat | null>(null)
+const revertPrompt = ref(false)
+
+// FR-014: editing one file as YAML; the form is locked meanwhile.
+const previewPanel = ref<InstanceType<typeof YamlPreview>>()
+const editingFile = ref<FileName | null>(null)
+const yamlErrors = ref<YamlError[]>([])
+const notices = ref<string[]>([])
+const applying = ref(false)
 
 // FR-005: for new configurations the instance-id follows the hostname until edited.
 const autoInstanceId = ref(false)
@@ -52,7 +63,9 @@ const templates = ref<ItemTemplates | null>(null)
 provideTemplates(templates)
 
 const isNew = computed(() => !stored.value)
-const dirty = computed(() => !!form.value && JSON.stringify(form.value) !== savedSnapshot.value)
+const dirty = computed(
+  () => !!form.value && (JSON.stringify(form.value) !== savedSnapshot.value || editingFile.value !== null),
+)
 const { pending: leavePending } = useUnsavedGuard(dirty)
 
 const preview = usePreview(form)
@@ -91,11 +104,22 @@ const summaries = computed(() => {
       f.ssh.authorized_keys.length > 0 && plural(f.ssh.authorized_keys.length, 'key'),
     ]),
     disks: f.disks.length ? plural(f.disks.length, 'disk') : '',
+    additional: (() => {
+      const count =
+        Object.keys(f.additional.user_data).length +
+        Object.keys(f.additional.meta_data).length +
+        Object.keys(f.additional.network).length +
+        (f.additional.vendor_data ? 1 : 0)
+      return count ? plural(count, 'key') : ''
+    })(),
   } as Record<string, string>
 })
 
 function setLoaded(config: StoredConfiguration | null) {
   stored.value = config
+  editingFile.value = null
+  yamlErrors.value = []
+  notices.value = []
   form.value = config ? toConfiguration(config) : clone(newConfiguration.value!)
   savedSnapshot.value = config ? JSON.stringify(form.value) : ''
   autoInstanceId.value = !config
@@ -134,8 +158,55 @@ watch(
   },
 )
 
+function startEditing(file: FileName) {
+  editingFile.value = file
+  yamlErrors.value = []
+  notices.value = []
+}
+
+function discardYaml() {
+  editingFile.value = null
+  yamlErrors.value = []
+}
+
+/** FR-014: parse the edited YAML back into the form. Returns false if it has errors. */
+async function applyYaml(text: string): Promise<boolean> {
+  if (!form.value || !editingFile.value) return true
+  applying.value = true
+  try {
+    const result = await api.parse(form.value, editingFile.value, text)
+    form.value = result.configuration
+    autoInstanceId.value = false
+    notices.value = result.notices
+    editingFile.value = null
+    yamlErrors.value = []
+    return true
+  } catch (error) {
+    if (error instanceof ApiError && error.yamlErrors.length) {
+      yamlErrors.value = error.yamlErrors
+    } else if (error instanceof ApiError && error.issues.length) {
+      yamlErrors.value = error.issues.map((issue) => ({ line: null, msg: `${issue.loc.join(' › ')}: ${issue.msg}` }))
+    } else {
+      yamlErrors.value = [{ line: null, msg: (error as Error).message }]
+    }
+    message.value = { text: 'The YAML contains errors.', color: 'error' }
+    return false
+  } finally {
+    applying.value = false
+  }
+}
+
+/** FR-014: discard all changes and go back to the last saved state. */
+function revertToSaved() {
+  revertPrompt.value = false
+  setLoaded(stored.value)
+  message.value = { text: 'Reverted to the last saved state.', color: 'info' }
+}
+
 async function save(): Promise<boolean> {
   if (!form.value) return false
+  // Unapplied YAML edits are applied first (FR-014).
+  if (editingFile.value && !(await applyYaml(previewPanel.value?.editText ?? ''))) return false
   saving.value = true
   try {
     const result = stored.value
@@ -177,15 +248,34 @@ function startDownload(format: ImageFormat) {
   link.click()
 }
 
+/** FR-014: schema violations do not block saving, but the download warns about them. */
+function downloadChecked(format: ImageFormat) {
+  if (preview.schemaIssues.value.length) schemaPrompt.value = format
+  else startDownload(format)
+}
+
 function requestDownload(format: ImageFormat) {
   if (isNew.value || dirty.value) downloadPrompt.value = format
-  else startDownload(format)
+  else downloadChecked(format)
 }
 
 async function saveAndDownload() {
   const format = downloadPrompt.value!
   downloadPrompt.value = null
-  if (await save()) startDownload(format)
+  if (await save()) downloadChecked(format)
+}
+
+function confirmSchemaDownload() {
+  const format = schemaPrompt.value!
+  schemaPrompt.value = null
+  startDownload(format)
+}
+
+const yamlNotice = (section: string) => {
+  const keys = form.value ? yamlOnlyKeys(form.value, section) : []
+  return keys.length
+    ? `Kept as YAML in the additional settings (the form cannot show all of it): ${keys.join(', ')}`
+    : undefined
 }
 
 const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
@@ -214,6 +304,9 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
         />
         <v-chip v-if="dirty" color="warning" variant="tonal" size="small">Unsaved changes</v-chip>
         <v-spacer />
+        <v-btn v-if="dirty && stored" variant="text" :prepend-icon="RotateCcw" @click="revertPrompt = true">
+          Revert to saved
+        </v-btn>
         <v-btn color="primary" :prepend-icon="Save" :loading="saving" :disabled="!dirty && !isNew" @click="save">
           Save
         </v-btn>
@@ -235,7 +328,17 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
         </v-menu>
       </div>
 
-      <v-expansion-panels v-model="openSections" multiple variant="accordion" class="mb-4">
+      <v-alert v-if="editingFile" type="info" variant="tonal" density="compact" class="mb-2">
+        The form is locked while {{ editingFile }} is edited as YAML below.
+      </v-alert>
+      <v-expansion-panels
+        v-model="openSections"
+        multiple
+        variant="accordion"
+        class="mb-4"
+        :class="{ locked: !!editingFile }"
+        :inert="!!editingFile"
+      >
         <SectionPanel
           value="basics"
           title="Basics"
@@ -243,6 +346,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
           help="Hostname, instance ID, timezone and locale. The instance ID tells cloud-init whether this is a new instance."
           :docs="`${DOCS}/datasources/nocloud.html`"
           :error-count="errorCount('basics')"
+          :notice="yamlNotice('basics')"
         >
           <BasicsSection
             v-model="form!.basics"
@@ -257,6 +361,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
           help="Network interfaces and bridges, written to network-config in Netplan version 2 format."
           :docs="`${DOCS}/network-config-format-v2.html`"
           :error-count="errorCount('network')"
+          :notice="yamlNotice('network')"
         >
           <NetworkSection v-model="form!.network" />
         </SectionPanel>
@@ -267,6 +372,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
           help="Refresh package sources, upgrade the system and install additional Debian packages on first boot."
           :docs="`${DOCS}/modules.html#package-update-upgrade-install`"
           :error-count="errorCount('packages')"
+          :notice="yamlNotice('packages')"
         >
           <PackagesSection v-model="form!.packages" />
         </SectionPanel>
@@ -277,6 +383,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
           help="Files created on the VM. Use 'defer' for files owned by users that cloud-init creates."
           :docs="`${DOCS}/modules.html#write-files`"
           :error-count="errorCount('write_files')"
+          :notice="yamlNotice('write_files')"
         >
           <FilesSection v-model="form!.write_files" />
         </SectionPanel>
@@ -287,6 +394,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
           help="Commands run at boot: runcmd once at the end of the first boot, bootcmd early on every boot."
           :docs="`${DOCS}/modules.html#runcmd`"
           :error-count="errorCount('commands')"
+          :notice="yamlNotice('commands')"
         >
           <CommandsSection v-model="form!.commands" />
         </SectionPanel>
@@ -297,6 +405,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
           help="User accounts with groups, sudo rules, passwords and SSH keys. Passwords are stored only as hashes."
           :docs="`${DOCS}/modules.html#users-and-groups`"
           :error-count="errorCount('users')"
+          :notice="yamlNotice('users')"
         >
           <UsersSection v-model="form!.users" />
         </SectionPanel>
@@ -307,6 +416,7 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
           help="SSH access. Secure defaults: no password login, no root login."
           :docs="`${DOCS}/modules.html#ssh`"
           :error-count="errorCount('ssh')"
+          :notice="yamlNotice('ssh')"
         >
           <SshSection v-model="form!.ssh" />
         </SectionPanel>
@@ -317,18 +427,38 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
           help="Partition, format and mount additional disks (disk_setup, fs_setup, mounts)."
           :docs="`${DOCS}/modules.html#disk-setup`"
           :error-count="errorCount('disks')"
+          :notice="yamlNotice('disks')"
         >
           <DisksSection v-model="form!.disks" />
+        </SectionPanel>
+        <SectionPanel
+          value="additional"
+          title="Additional settings (YAML only)"
+          :summary="summaries.additional"
+          help="Settings the form does not cover, e.g. further cloud-init modules or bonds and VLANs. They are kept unchanged and can only be edited with 'Edit as YAML' in the preview."
+          :docs="`${DOCS}/modules.html`"
+          :error-count="errorCount('additional')"
+        >
+          <AdditionalSection v-model="form!.additional" @edit="startEditing" />
         </SectionPanel>
       </v-expansion-panels>
 
       <YamlPreview
+        ref="previewPanel"
         :files="preview.files.value"
         :errors="preview.errors.value"
         :warnings="preview.warnings.value"
+        :schema-issues="preview.schemaIssues.value"
         :failure="preview.failure.value"
         :loading="preview.loading.value"
+        :editing="editingFile"
+        :yaml-errors="yamlErrors"
+        :notices="notices"
+        :applying="applying"
         @focus="issues.focus"
+        @edit="startEditing"
+        @apply="applyYaml"
+        @discard="discardYaml"
       />
     </template>
 
@@ -368,6 +498,37 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
       </v-card>
     </v-dialog>
 
+    <v-dialog :model-value="!!schemaPrompt" max-width="560" @update:model-value="schemaPrompt = null">
+      <v-card title="Configuration does not match the cloud-init schema">
+        <v-card-text>
+          cloud-init reports {{ preview.schemaIssues.value.length }} schema
+          {{ preview.schemaIssues.value.length === 1 ? 'violation' : 'violations' }}. cloud-init may ignore or reject
+          these settings at boot:
+          <ul class="mt-2 ml-4">
+            <li v-for="(issue, index) in preview.schemaIssues.value.slice(0, 5)" :key="index">
+              {{ issue.file }}{{ issue.line ? `, line ${issue.line}` : '' }}: {{ issue.msg }}
+            </li>
+          </ul>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn @click="schemaPrompt = null">Cancel</v-btn>
+          <v-btn color="warning" variant="flat" @click="confirmSchemaDownload">Download anyway</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="revertPrompt" max-width="460">
+      <v-card title="Revert to the last saved state?">
+        <v-card-text>All unsaved changes in the form and in the YAML editor are discarded.</v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn @click="revertPrompt = false">Cancel</v-btn>
+          <v-btn color="error" @click="revertToSaved">Revert</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar
       :model-value="!!message"
       :color="message?.color"
@@ -382,6 +543,9 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
 <style scoped>
 .editor {
   max-width: 1400px;
+}
+.locked {
+  opacity: 0.6;
 }
 .name-field {
   max-width: 28rem;

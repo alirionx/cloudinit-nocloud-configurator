@@ -71,6 +71,9 @@ Frontend (Node 24), run in `frontend/`:
 npm ci                # install from package-lock.json
 npm run dev           # Vite dev server; proxies /api, /healthz, /readyz to :8000
 npm run build         # type check + production build to dist/
+npm test              # unit tests (Vitest)
+npm run test:e2e      # end-to-end tests (Playwright, Chromium); needs `npm run build` and uv
+                      # (starts the backend on :8124 with a fresh TinyDB); incl. WCAG contrast checks
 ```
 
 Container, run in the repository root:
@@ -80,4 +83,11 @@ buildah bud --layers --format docker -t cloudinit-nocloud-configurator .   # or:
 docker run --rm -p 8000:8000 cloudinit-nocloud-configurator                # needs docker or podman
 scripts/smoke-test.sh   # build + non-root, seed image tools, read-only rootfs, health, TinyDB + CouchDB
 ENGINE=buildah scripts/smoke-test.sh   # without docker/podman; skips read-only rootfs and CouchDB checks
+```
+
+Acceptance test with a real VM (FR-002): boots the Debian 13 cloud image with seeds in all three
+formats (QEMU/KVM + OVMF, sudo if not in group kvm) and checks what cloud-init applied:
+
+```sh
+APP_URL=http://127.0.0.1:8000 scripts/boot-test.sh [iso|raw|qcow2]
 ```

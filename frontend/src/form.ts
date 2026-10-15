@@ -61,3 +61,23 @@ export function useTemplates() {
     return clone(templates.value[kind])
   }
 }
+
+/** user-data keys per form section (mirrors the backend's `keys.py`, for hints only). */
+const SECTION_KEYS: Record<string, string[]> = {
+  basics: ['fqdn', 'manage_etc_hosts', 'timezone', 'locale'],
+  users: ['users', 'groups'],
+  ssh: ['ssh_pwauth', 'disable_root', 'ssh_deletekeys', 'ssh_genkeytypes', 'ssh_authorized_keys'],
+  packages: ['package_update', 'package_upgrade', 'package_reboot_if_required', 'packages'],
+  write_files: ['write_files'],
+  commands: ['bootcmd', 'runcmd'],
+  disks: ['disk_setup', 'fs_setup', 'mounts'],
+  network: [],
+}
+
+/** FR-014: keys of a section that are kept as YAML-only additional settings. */
+export function yamlOnlyKeys(config: Configuration, section: string): string[] {
+  if (section === 'network') {
+    return ['ethernets', 'bridges'].filter((key) => key in config.additional.network)
+  }
+  return (SECTION_KEYS[section] ?? []).filter((key) => key in config.additional.user_data)
+}

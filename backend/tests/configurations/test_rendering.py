@@ -32,6 +32,7 @@ def test_user_data_is_cloud_config_with_basics():
     assert user_data.startswith("#cloud-config\n")
     assert yaml.safe_load(user_data) == {
         "fqdn": "web-01.example.com",
+        "manage_etc_hosts": "localhost",
         "timezone": "Europe/Berlin",
         "locale": "de_DE.UTF-8",
         **SECURE_SSH,
@@ -45,6 +46,7 @@ def test_exact_output():
     assert files["user-data"] == (
         "#cloud-config\n"
         "fqdn: web-01.example.com\n"
+        "manage_etc_hosts: localhost\n"
         "timezone: Europe/Berlin\n"
         "locale: de_DE.UTF-8\n"
         "ssh_pwauth: false\n"
@@ -86,3 +88,12 @@ def test_ambiguous_strings_stay_strings():
     """FR-004: strings that look like other YAML types are quoted."""
     data = {"a": "yes", "b": "0644", "c": "null", "d": "1.0", "e": "äöü"}
     assert yaml.safe_load(to_yaml(data)) == data
+
+
+def test_fqdn_is_added_to_etc_hosts():
+    """FR-005: with an FQDN, cloud-init maintains the 127.0.1.1 line in /etc/hosts so that
+    the FQDN resolves (verified by booting Debian 13); without FQDN /etc/hosts is untouched."""
+    with_fqdn = yaml.safe_load(render_files(FULL)["user-data"])
+    assert with_fqdn["manage_etc_hosts"] == "localhost"
+    without = Configuration(name="x", basics=Basics(instance_id="iid-1", hostname="web-01"))
+    assert "manage_etc_hosts" not in yaml.safe_load(render_files(without)["user-data"])

@@ -3,8 +3,11 @@ import type {
   Configuration,
   Defaults,
   ConfigurationSummary,
+  FileName,
   Issue,
+  ParseResponse,
   PreviewResponse,
+  YamlError,
   StoredConfiguration,
 } from './types'
 
@@ -12,17 +15,22 @@ import type {
 export class ApiError extends Error {
   readonly status: number
   readonly issues: Issue[]
+  /** YAML errors with line numbers (parse endpoint, FR-014). */
+  readonly yamlErrors: YamlError[]
 
-  constructor(status: number, message: string, issues: Issue[] = []) {
+  constructor(status: number, message: string, issues: Issue[] = [], yamlErrors: YamlError[] = []) {
     super(message)
     this.status = status
     this.issues = issues
+    this.yamlErrors = yamlErrors
   }
 }
 
 interface ValidationDetail {
   loc: (string | number)[]
   msg: string
+  type?: string
+  line?: number | null
 }
 
 async function request<T>(method: string, url: string, body?: unknown, signal?: AbortSignal): Promise<T> {
@@ -36,6 +44,10 @@ async function request<T>(method: string, url: string, body?: unknown, signal?: 
   const data = await response.json().catch(() => null)
   if (!response.ok) {
     const detail = data?.detail
+    if (response.status === 422 && Array.isArray(detail) && detail.some((d: ValidationDetail) => d.type === 'yaml_error')) {
+      const errors = (detail as ValidationDetail[]).map((d) => ({ line: d.line ?? null, msg: d.msg }))
+      throw new ApiError(422, 'The YAML contains errors.', [], errors)
+    }
     if (response.status === 422 && Array.isArray(detail)) {
       // Drop the leading "body" segment so paths match the form model.
       const issues = (detail as ValidationDetail[]).map((d) => ({
@@ -61,6 +73,8 @@ export const api = {
   duplicate: (id: string) => request<StoredConfiguration>('POST', `${BASE}/${id}/duplicate`),
   preview: (config: Configuration, signal?: AbortSignal) =>
     request<PreviewResponse>('POST', '/api/preview', config, signal),
+  parse: (configuration: Configuration, file: FileName, content: string) =>
+    request<ParseResponse>('POST', '/api/parse', { configuration, file, content }),
   defaults: () => request<Defaults>('GET', '/api/defaults'),
   imageUrl: (id: string, format: ImageFormat) => `${BASE}/${id}/image?format=${format}`,
 }

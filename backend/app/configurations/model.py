@@ -9,6 +9,7 @@ from typing import Annotated
 
 from pydantic import Field
 
+from app.configurations.sections.additional import Additional
 from app.configurations.sections.basics import Basics, suggest_instance_id
 from app.configurations.sections.commands import Commands
 from app.configurations.sections.common import Section
@@ -38,3 +39,6 @@ class Configuration(Section):
     users: Users = Field(default_factory=Users, description="FR-010")
     ssh: Ssh = Field(default_factory=Ssh, description="FR-011")
     disks: list[Disk] = Field(default_factory=list, description="FR-012")
+    additional: Additional = Field(
+        default_factory=Additional, description="FR-014: settings edited as YAML only."
+    )

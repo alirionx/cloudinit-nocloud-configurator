@@ -9,6 +9,8 @@ defineProps<{
   help: string
   docs?: string
   errorCount?: number
+  /** FR-014: hint that parts of this section are kept as YAML only. */
+  notice?: string
 }>()
 </script>
 
@@ -31,6 +33,7 @@ defineProps<{
           cloud-init documentation<ExternalLink :size="14" class="ml-1" aria-hidden="true" />
         </a>
       </p>
+      <v-alert v-if="notice" type="info" variant="tonal" density="compact" class="mb-4">{{ notice }}</v-alert>
       <slot />
     </v-expansion-panel-text>
   </v-expansion-panel>

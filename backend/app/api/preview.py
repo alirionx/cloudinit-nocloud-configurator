@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.configurations.checks import Issue, check
 from app.configurations.model import Configuration
 from app.configurations.rendering import render_files
+from app.configurations.schema import SchemaIssue, validate_files
 from app.configurations.service import prepare_for_save
 
 router = APIRouter(prefix="/api", tags=["preview"])
@@ -25,12 +26,17 @@ class RenderedFiles(BaseModel):
 class PreviewResponse(BaseModel):
     files: RenderedFiles
     warnings: list[Issue] = Field(description="Non-blocking hints with the affected field.")
+    schema_issues: list[SchemaIssue] = Field(
+        description="Violations of the cloud-init JSON schema (NFR-008), with file and line."
+    )
 
 
 def preview_of(configuration: Configuration) -> PreviewResponse:
+    files = render_files(configuration)
     return PreviewResponse(
-        files=RenderedFiles.model_validate(render_files(configuration)),
+        files=RenderedFiles.model_validate(files),
         warnings=check(configuration).warnings,
+        schema_issues=validate_files(files),
     )
 
 

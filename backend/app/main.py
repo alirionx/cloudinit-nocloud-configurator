@@ -10,9 +10,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
 from app import health, images
-from app.api import configurations, defaults, preview
+from app.api import configurations, defaults, parse, preview
 from app.configurations.sections.users import PasswordHashingError
 from app.configurations.service import ConfigurationInvalidError
+from app.configurations.yaml_input import YamlInputError
 from app.repository import (
     ConflictError,
     DatastoreUnavailableError,
@@ -57,6 +58,7 @@ def create_app(settings: Settings | None = None, repository: Repository | None =
     app.include_router(configurations.router)
     app.include_router(preview.router)
     app.include_router(defaults.router)
+    app.include_router(parse.router)
     _add_error_handlers(app)
     if settings.static_dir is not None:
         # Registered last so that API and health routes take precedence.
@@ -94,6 +96,20 @@ def _add_error_handlers(app: FastAPI) -> None:
         """Cross-field errors, in the same format as field validation errors."""
         detail = [
             {"loc": ["body", *issue.loc], "msg": issue.msg, "type": "value_error"}
+            for issue in exc.issues
+        ]
+        return JSONResponse(status_code=422, content={"detail": detail})
+
+    @app.exception_handler(YamlInputError)
+    async def invalid_yaml(request: Request, exc: YamlInputError) -> JSONResponse:
+        """FR-014: YAML errors with line numbers."""
+        detail = [
+            {
+                "loc": ["body", "content", *issue.path],
+                "line": issue.line,
+                "msg": issue.msg,
+                "type": "yaml_error",
+            }
             for issue in exc.issues
         ]
         return JSONResponse(status_code=422, content={"detail": detail})

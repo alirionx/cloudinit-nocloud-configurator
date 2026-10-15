@@ -61,11 +61,20 @@ def _without_empty(data: dict[str, Any]) -> dict[str, Any]:
 # --- meta-data (FR-005) ---
 
 
-def render_meta_data(config: Configuration) -> str:
+def meta_data(config: Configuration) -> dict[str, Any]:
     basics = config.basics
-    return to_yaml(
-        _without_empty({"instance-id": basics.instance_id, "local-hostname": basics.hostname})
-    )
+    form = _without_empty({"instance-id": basics.instance_id, "local-hostname": basics.hostname})
+    return _merge(form, config.additional.meta_data)
+
+
+def render_meta_data(config: Configuration) -> str:
+    return to_yaml(meta_data(config))
+
+
+def _merge(form: dict[str, Any], additional: dict[str, Any]) -> dict[str, Any]:
+    """FR-014: additional settings are added; for a key in both, the additional value is
+    used (conflicts with non-default form values are reported by `checks`)."""
+    return form | additional
 
 
 # --- network-config (FR-006) ---
@@ -91,8 +100,11 @@ def _address_settings(settings: AddressSettings) -> dict[str, Any]:
     )
 
 
-def network_data(network: Network) -> dict[str, Any] | None:
-    if network.is_empty():
+def network_data(
+    network: Network, additional: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
+    additional = additional or {}
+    if network.is_empty() and not additional:
         return None
     ethernets = {}
     for nic in network.ethernets:
@@ -107,13 +119,12 @@ def network_data(network: Network) -> dict[str, Any] | None:
             {"interfaces": bridge.interfaces} | _address_settings(bridge)
             | {"parameters": parameters}
         )  # fmt: skip
-    return {
-        "network": {"version": 2} | _without_empty({"ethernets": ethernets, "bridges": bridges})
-    }
+    devices = _without_empty({"ethernets": ethernets, "bridges": bridges})
+    return {"network": _merge({"version": 2} | devices, additional)}
 
 
 def render_network_config(config: Configuration) -> str | None:
-    data = network_data(config.network)
+    data = network_data(config.network, config.additional.network)
     return to_yaml(data) if data else None
 
 
@@ -205,6 +216,11 @@ def _disks_data(disks: list[Disk]) -> dict[str, Any]:
 
 
 def user_data(config: Configuration) -> dict[str, Any]:
+    return _merge(form_user_data(config), config.additional.user_data)
+
+
+def form_user_data(config: Configuration) -> dict[str, Any]:
+    """The user-data keys produced by the form sections alone."""
     basics = config.basics
     packages = config.packages
     write_files = [
@@ -222,7 +238,16 @@ def user_data(config: Configuration) -> dict[str, Any]:
         for file in config.write_files
     ]
     return (
-        _without_empty({"fqdn": basics.fqdn, "timezone": basics.timezone, "locale": basics.locale})
+        _without_empty(
+            {
+                "fqdn": basics.fqdn,
+                # Without an /etc/hosts entry the FQDN does not resolve ('hostname -f');
+                # 'localhost' only maintains the 127.0.1.1 line and leaves the rest alone.
+                "manage_etc_hosts": "localhost" if basics.fqdn else None,
+                "timezone": basics.timezone,
+                "locale": basics.locale,
+            }
+        )
         | _users_data(config.users)
         | _ssh_data(config.ssh)
         | _without_empty(
@@ -245,11 +270,18 @@ def render_user_data(config: Configuration) -> str:
     return "#cloud-config\n" + (to_yaml(user_data(config)) or "{}\n")
 
 
+def render_vendor_data(config: Configuration) -> str | None:
+    vendor_data = config.additional.vendor_data
+    if vendor_data is None:
+        return None
+    return "#cloud-config\n" + (to_yaml(vendor_data) or "{}\n")
+
+
 def render_files(config: Configuration) -> dict[str, str | None]:
     """All NoCloud files; `None` for optional files that have no content."""
     return {
         USER_DATA: render_user_data(config),
         META_DATA: render_meta_data(config),
         NETWORK_CONFIG: render_network_config(config),
-        VENDOR_DATA: None,
+        VENDOR_DATA: render_vendor_data(config),
     }

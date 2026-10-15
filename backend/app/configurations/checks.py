@@ -13,6 +13,12 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel
 
+from app.configurations.keys import (
+    KNOWN_USER_DATA_KEYS,
+    META_DATA_FIELDS,
+    NETWORK_KEYS,
+    SECTION_OF_KEY,
+)
 from app.configurations.model import Configuration
 from app.configurations.sections.disks import LABEL_LIMITS
 from app.configurations.sections.network import AddressSettings
@@ -93,6 +99,7 @@ def check(config: Configuration) -> CheckResult:
     _check_users(config, result)
     _check_ssh(config, result)
     _check_disks(config, result)
+    _check_additional(config, result)
     return result
 
 
@@ -131,6 +138,13 @@ def _check_network(config: Configuration, result: CheckResult) -> None:
         [nic.name for nic in network.ethernets] + [bridge.name for bridge in network.bridges]
     )
     nic_index = {nic.name: index for index, nic in enumerate(network.ethernets)}
+    # Interfaces defined as additional settings (e.g. bonds, VLANs) may be bridge members.
+    extra_interfaces = {
+        name
+        for kind in ("bonds", "vlans", "ethernets", "wifis")
+        if isinstance(devices := config.additional.network.get(kind), dict)
+        for name in devices
+    }
     macs = Counter(nic.match_mac for nic in network.ethernets if nic.match_mac)
 
     for index, nic in enumerate(network.ethernets):
@@ -149,6 +163,8 @@ def _check_network(config: Configuration, result: CheckResult) -> None:
         if not bridge.interfaces:
             result.warn([*loc, "interfaces"], "the bridge has no member interfaces")
         for member in bridge.interfaces:
+            if member in extra_interfaces and member not in nic_index:
+                continue
             if member not in nic_index:
                 result.error([*loc, "interfaces"], f"'{member}' is not a defined NIC")
                 continue
@@ -301,3 +317,79 @@ def _check_disks(config: Configuration, result: CheckResult) -> None:
                     f"requires '{tool}' in the VM image (disks are set up before packages "
                     "are installed)",
                 )
+
+
+# --- FR-014 ---
+
+CRYPT_PREFIXES = ("$1$", "$5$", "$6$", "$y$", "$2a$", "$2b$", "$2y$", "$gy$", "$7$")
+
+
+def _is_hashed(value: object) -> bool:
+    return isinstance(value, str) and value.startswith(CRYPT_PREFIXES)
+
+
+def _chpasswd_has_plain_text(chpasswd: object) -> bool:
+    """chpasswd: `users` entries with `type: text`, or legacy `list` lines 'user:password'."""
+    if not isinstance(chpasswd, dict):
+        return False
+    users = chpasswd.get("users")
+    if isinstance(users, list) and any(
+        isinstance(entry, dict) and entry.get("type") == "text" for entry in users
+    ):
+        return True
+    legacy = chpasswd.get("list")
+    lines = legacy.splitlines() if isinstance(legacy, str) else legacy
+    if isinstance(lines, list):
+        for line in lines:
+            password = str(line).partition(":")[2]
+            if password and password != "RANDOM" and not _is_hashed(password):
+                return True
+    return False
+
+
+def _plain_password_keys(user_data: dict) -> list[str]:
+    """Keys of additional user-data that contain plain-text passwords (NFR-007)."""
+    found = []
+    if "password" in user_data:  # cloud-init: plain password of the default user
+        found.append("password")
+    users = user_data.get("users")
+    if isinstance(users, list) and any(
+        isinstance(user, dict)
+        and ("plain_text_passwd" in user or ("passwd" in user and not _is_hashed(user["passwd"])))
+        for user in users
+    ):
+        found.append("users")
+    if _chpasswd_has_plain_text(user_data.get("chpasswd")):
+        found.append("chpasswd")
+    return found
+
+
+def _check_additional(config: Configuration, result: CheckResult) -> None:
+    from app.configurations.rendering import form_user_data  # avoid import cycle
+
+    additional = config.additional
+    known = KNOWN_USER_DATA_KEYS & set(additional.user_data)
+    if known:
+        form = form_user_data(config)
+        default = form_user_data(Configuration(name="default"))
+        for key in sorted(known):
+            if form.get(key) != default.get(key):
+                result.error(
+                    ["additional", "user_data", key],
+                    f"'{key}' is set both in the form ({SECTION_OF_KEY[key]}) and in the "
+                    "additional settings; remove one of them",
+                )
+    for key in META_DATA_FIELDS.keys() & set(additional.meta_data):
+        result.error(["additional", "meta_data", key], f"'{key}' is managed by the basics section")
+    if not config.network.is_empty():
+        for key in set(NETWORK_KEYS) & set(additional.network):
+            if key != "version" or additional.network[key] != 2:
+                result.error(
+                    ["additional", "network", key], f"'{key}' is managed by the network section"
+                )
+    for key in _plain_password_keys(additional.user_data):
+        result.warn(
+            ["additional", "user_data", key],
+            "contains a plain-text password; use a password hash instead (e.g. "
+            "'mkpasswd -m sha-512')",
+        )

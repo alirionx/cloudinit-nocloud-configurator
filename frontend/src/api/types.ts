@@ -114,6 +114,14 @@ export interface Disk {
   partitions: Partition[]
 }
 
+// FR-014: settings edited as YAML only.
+export interface Additional {
+  user_data: Record<string, unknown>
+  meta_data: Record<string, unknown>
+  network: Record<string, unknown>
+  vendor_data: Record<string, unknown> | null
+}
+
 export interface Configuration {
   name: string
   basics: Basics
@@ -124,6 +132,7 @@ export interface Configuration {
   users: Users
   ssh: Ssh
   disks: Disk[]
+  additional: Additional
 }
 
 export interface StoredConfiguration extends Configuration {
@@ -149,9 +158,29 @@ export interface Issue {
 
 export type FileName = 'user-data' | 'meta-data' | 'network-config' | 'vendor-data'
 
+/** A violation of the cloud-init JSON schema (NFR-008). */
+export interface SchemaIssue {
+  file: FileName
+  path: (string | number)[]
+  line: number | null
+  msg: string
+}
+
 export interface PreviewResponse {
   files: Record<FileName, string | null>
   warnings: Issue[]
+  schema_issues: SchemaIssue[]
+}
+
+/** A YAML error from the parse endpoint (FR-014). */
+export interface YamlError {
+  line: number | null
+  msg: string
+}
+
+export interface ParseResponse {
+  configuration: Configuration
+  notices: string[]
 }
 
 export interface ItemTemplates {

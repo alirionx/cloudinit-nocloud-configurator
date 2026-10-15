@@ -8,6 +8,7 @@ dependencies = [
     "anyio>=4.15.1",
     "fastapi>=0.143.2",
     "httpx2>=2.13.1",
+    "jsonschema>=4.26.0",
     "pydantic-settings>=2.16.0",
     "pyyaml>=6.0.3",
     "tinydb>=4.9.0",

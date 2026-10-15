@@ -1,7 +1,7 @@
 // FR-013: live preview, rendered by the backend, debounced.
 import { type Ref, onBeforeUnmount, ref, watch } from 'vue'
 import { ApiError, api } from '../api/client'
-import type { Configuration, FileName, Issue } from '../api/types'
+import type { Configuration, FileName, Issue, SchemaIssue } from '../api/types'
 
 /** Delay after the last change; well below the 1 s required by FR-013. */
 export const PREVIEW_DEBOUNCE_MS = 300
@@ -9,6 +9,7 @@ export const PREVIEW_DEBOUNCE_MS = 300
 export function usePreview(form: Ref<Configuration | null>, delay = PREVIEW_DEBOUNCE_MS) {
   const files = ref<Record<FileName, string | null> | null>(null)
   const warnings = ref<Issue[]>([])
+  const schemaIssues = ref<SchemaIssue[]>([])
   const errors = ref<Issue[]>([])
   const failure = ref<string | null>(null)
   const loading = ref(false)
@@ -25,6 +26,7 @@ export function usePreview(form: Ref<Configuration | null>, delay = PREVIEW_DEBO
       const result = await api.preview(form.value, controller.signal)
       files.value = result.files
       warnings.value = result.warnings
+      schemaIssues.value = result.schema_issues
       errors.value = []
       failure.value = null
     } catch (error) {
@@ -52,5 +54,5 @@ export function usePreview(form: Ref<Configuration | null>, delay = PREVIEW_DEBO
     controller?.abort()
   })
 
-  return { files, warnings, errors, failure, loading, refresh }
+  return { files, warnings, schemaIssues, errors, failure, loading, refresh }
 }
