@@ -1,7 +1,7 @@
 # Requirements Specification: cloudinit-nocloud-configurator
 
 > **Status:** MVP implemented (steps 1–7), Helm chart pending
-> **Version:** 0.17
+> **Version:** 0.18
 > **Last updated:** 2026-10-15
 > **Owner:** Daniel Quilitzsch
 
@@ -26,6 +26,7 @@
 | 0.13    | 2026-10-15 | App name set: cloudinit-nocloud-configurator | Claude |
 | 0.14    | 2026-10-15 | OQ-09 decided: Debian as target OS of the VMs; FR-007, FR-010, assumptions and R-06 updated | Claude |
 | 0.15    | 2026-10-15 | Problem statement (1.2) refined; NFR-015/NFR-016 on established, actively maintained open-source libraries added (criteria in 8.5); R-08 added; `genisoimage` removed | Claude |
+| 0.18    | 2026-10-15 | Clarifications of v0.17 confirmed by the product owner: FQDN with `manage_etc_hosts: localhost` (FR-005), numeric `fs_setup` partitions with filtered schema false positive (FR-012, R-09), SSH defaults always rendered (FR-011), hostname optional single label (FR-005), `lock_passwd` default on (FR-010), Vuetify (7.2), app starts while CouchDB is unreachable (DS-005/DS-006), additional API endpoints (FR-015) | Daniel Quilitzsch |
 | 0.17    | 2026-10-15 | Implementation clarifications from steps 1–7 recorded (FR-005, FR-006, FR-008, FR-010 to FR-015, NFR-008, section 7.2, R-09); FR-001 to FR-016 marked as implemented; DS-003 and NFR-008 implemented in the MVP | Claude |
 | 0.16    | 2026-10-15 | **Document translated to English** (German no longer required). ID prefixes changed: FA→FR, NFA→NFR, OF→OQ, Z→G (numbers unchanged). Added: managing configurations (FR-015, UI-02), light/dark theme switch (FR-016), English-only UI (NFR-014), MIT license (NFR-017), Python 3.13, NFR-011 to NFR-013, TinyDB exception (8.5). MVP scope = all "Must" requirements | Claude |
 
