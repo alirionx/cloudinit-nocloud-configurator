@@ -15,12 +15,18 @@ Review this list for every release.
 | pydantic-settings | Settings from environment variables (NFR-003) | MIT | Pydantic organization |
 | anyio | Runs blocking TinyDB calls in worker threads; async test support | MIT | agronholm / community |
 | tinydb | Datastore backend for development and single instances (section 8.3) | MIT | msiemens (see exceptions) |
+| pyyaml | Rendering the NoCloud YAML files (FR-001, FR-004) | MIT | YAML organization |
 | httpx2 | Async HTTP client for the CouchDB API; also used by FastAPI's `TestClient` (successor of `httpx` recommended by Starlette) | BSD-3-Clause | Pydantic organization |
 
 Notable transitive dependencies: `pydantic` (MIT), `starlette` (BSD-3-Clause).
 
 CouchDB is accessed via its documented HTTP API instead of a client library: the only
 async Python client, `aiocouch`, had no release within the last 12 months (LIB-002).
+
+PyYAML: last release 6.0.3 (2025-09); LIB-002 is met through ongoing commits, including a
+security fix (DoS via merge keys, 2026-06) that is not released yet. Relevant once user YAML is
+parsed (FR-014): limit the input size there. `ruamel.yaml` was not chosen: effectively a single
+maintainer (LIB-003).
 
 ## Python development
 

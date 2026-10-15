@@ -58,6 +58,16 @@ run_in_image sh -euc '
 '
 echo "ok"
 
+# api_round_trip <base-url>: create a configuration and render its files (FR-001, FR-015).
+api_round_trip() {
+  id="$(curl -sf -X POST "$1/api/configurations" -H 'content-type: application/json' \
+    -d '{"name":"smoke","basics":{"hostname":"smoke-01"}}' | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
+  [ -n "$id" ] || { echo "FAIL: could not create a configuration"; return 1; }
+  curl -sf "$1/api/configurations/$id/files" | grep -q 'local-hostname: smoke-01' \
+    || { echo "FAIL: rendered meta-data is wrong"; return 1; }
+  echo "ok"
+}
+
 # wait_for <url>: poll until the URL answers with HTTP 2xx (max. 60 s).
 wait_for() {
   for _ in $(seq 1 60); do
@@ -102,6 +112,9 @@ echo "==> Section 8.1: frontend is served"
 curl -sf "http://127.0.0.1:$PORT/" | grep -q '<div id="app">'
 echo "ok"
 
+echo "==> FR-001 / FR-015: configuration API (TinyDB)"
+api_round_trip "http://127.0.0.1:$PORT"
+
 if [ "$ENGINE" != "buildah" ]; then
   echo "==> DS-005 / DS-006: CouchDB backend"
   app_port=$((PORT + 1))
@@ -117,6 +130,8 @@ if [ "$ENGINE" != "buildah" ]; then
   wait_for "http://127.0.0.1:$app_port/readyz"
   curl -sf "http://127.0.0.1:$app_port/readyz" | tee /dev/stderr | grep -q '"datastore":"ok"'
   echo
+  echo "==> FR-001 / FR-015: configuration API (CouchDB)"
+  api_round_trip "http://127.0.0.1:$app_port"
 else
   echo "note: CouchDB check needs docker or podman; skipped"
 fi
