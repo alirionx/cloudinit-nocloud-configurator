@@ -102,6 +102,16 @@ The GPL-licensed tools are invoked as separate executables and are not linked in
 application; they are distributed alongside it in the container image (mere aggregation), so the
 application itself stays MIT-licensed (LIB-001, NFR-017).
 
+## CI (GitHub Actions)
+
+| Action | Purpose | License | Maintained by |
+|--------|---------|---------|---------------|
+| actions/checkout | Check out the repository | MIT | GitHub |
+| docker/setup-buildx-action | Buildx builder with GitHub Actions cache | Apache-2.0 | Docker |
+| docker/login-action | Log in to ghcr.io with the workflow token | Apache-2.0 | Docker |
+| docker/metadata-action | Image tags (`main`, `sha-<commit>`) and OCI labels | Apache-2.0 | Docker |
+| docker/build-push-action | Build and push the image | Apache-2.0 | Docker |
+
 ## Documented exceptions
 
 | Dependency | Criterion not met | Rationale |
