@@ -58,13 +58,19 @@ run_in_image sh -euc '
 '
 echo "ok"
 
-# api_round_trip <base-url>: create a configuration and render its files (FR-001, FR-015).
+# api_round_trip <base-url>: create a configuration, render it and download all image formats
+# (FR-001, FR-002, FR-003, FR-015).
 api_round_trip() {
   id="$(curl -sf -X POST "$1/api/configurations" -H 'content-type: application/json' \
     -d '{"name":"smoke","basics":{"hostname":"smoke-01"}}' | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
   [ -n "$id" ] || { echo "FAIL: could not create a configuration"; return 1; }
   curl -sf "$1/api/configurations/$id/files" | grep -q 'local-hostname: smoke-01' \
     || { echo "FAIL: rendered meta-data is wrong"; return 1; }
+  for format in iso raw qcow2; do
+    curl -sf -D - -o /dev/null "$1/api/configurations/$id/image?format=$format" \
+      | grep -qi "content-disposition: attachment" \
+      || { echo "FAIL: $format download"; return 1; }
+  done
   echo "ok"
 }
 

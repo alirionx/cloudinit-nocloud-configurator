@@ -17,7 +17,7 @@ def test_readyz_includes_datastore(tmp_path: Path):
     with TestClient(app) as client:
         response = client.get("/readyz")
     assert response.status_code == 200
-    assert response.json()["checks"] == {"datastore": "ok"}
+    assert response.json()["checks"] == {"datastore": "ok", "image-tools": "ok"}
 
 
 def test_readyz_fails_when_datastore_unavailable():
@@ -32,7 +32,7 @@ def test_readyz_fails_when_datastore_unavailable():
         assert client.get("/healthz").status_code == 200
         response = client.get("/readyz")
     assert response.status_code == 503
-    assert response.json()["checks"] == {"datastore": "failed"}
+    assert response.json()["checks"] == {"datastore": "failed", "image-tools": "ok"}
 
 
 def test_startup_fails_on_unusable_tinydb_path(tmp_path: Path):

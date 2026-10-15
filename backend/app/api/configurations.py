@@ -4,6 +4,7 @@ Invalid input is answered with HTTP 422 and field-level errors (FastAPI default)
 unknown IDs with 404, stale revisions with 409 (DS-003).
 """
 
+import logging
 from datetime import datetime
 from typing import Annotated, Self
 
@@ -13,6 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.configurations.model import Configuration
 from app.configurations.rendering import render_files
 from app.configurations.service import ConfigurationService, SortKey, StoredConfiguration
+from app.images import MEDIA_TYPES, ImageBuildError, ImageFormat, build_image, image_file_name
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/configurations", tags=["configurations"])
 
@@ -156,3 +160,42 @@ async def get_files(configuration_id: str, service: Service) -> RenderedFiles:
     """The rendered NoCloud files of a saved configuration (FR-001)."""
     stored = await service.get(configuration_id)
     return RenderedFiles.model_validate(render_files(stored.configuration))
+
+
+@router.get(
+    "/{configuration_id}/image",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "The seed image as a file download.",
+            "content": {"application/octet-stream": {}, "application/x-iso9660-image": {}},
+        },
+        500: {"description": "Image generation failed."},
+    },
+)
+async def download_image(
+    configuration_id: str,
+    service: Service,
+    image_format: Annotated[
+        ImageFormat, Query(alias="format", description="Image format.")
+    ] = ImageFormat.ISO,
+) -> Response:
+    """FR-002, FR-003: generate the seed image on the fly and deliver it directly.
+
+    Nothing is stored; temporary files are removed before the response is sent.
+    """
+    stored = await service.get(configuration_id)
+    try:
+        content = await build_image(render_files(stored.configuration), image_format)
+    except ImageBuildError as exc:
+        logger.error("Image generation failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Image generation failed.") from exc
+    file_name = image_file_name(stored.configuration.name, image_format)
+    return Response(
+        content=content,
+        media_type=MEDIA_TYPES[image_format],
+        headers={
+            "Content-Disposition": f'attachment; filename="{file_name}"',
+            "Cache-Control": "no-store",
+        },
+    )

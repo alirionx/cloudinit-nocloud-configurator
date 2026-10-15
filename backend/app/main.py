@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from app import health
+from app import health, images
 from app.api import configurations
 from app.repository import (
     ConflictError,
@@ -32,6 +32,9 @@ def create_app(settings: Settings | None = None, repository: Repository | None =
         repo = repository or create_repository(settings)
         app.state.repository = repo
         health.register_readiness_check(app, "datastore", repo.check)
+        health.register_readiness_check(app, "image-tools", _check_image_tools)
+        if missing := images.missing_tools():
+            logger.error("Image tools missing, downloads will fail: %s", ", ".join(missing))
         if settings.datastore_backend == "tinydb" and repository is None:
             logger.warning("TinyDB datastore active: run exactly one replica and one worker (R-02)")
         try:
@@ -54,6 +57,12 @@ def create_app(settings: Settings | None = None, repository: Repository | None =
         # Registered last so that API and health routes take precedence.
         _mount_frontend(app, settings.static_dir)
     return app
+
+
+async def _check_image_tools() -> None:
+    """FR-002: seed images can only be built if all image tools are installed."""
+    if missing := images.missing_tools():
+        raise RuntimeError(f"missing image tools: {', '.join(missing)}")
 
 
 def _add_error_handlers(app: FastAPI) -> None:
