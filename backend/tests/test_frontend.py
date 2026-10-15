@@ -52,3 +52,28 @@ def test_path_traversal_does_not_escape_static_dir(client):
     """Section 8.1: files outside the static directory are never served."""
     response = client.get("/..%2Fsecret.txt")
     assert "outside" not in response.text
+
+
+def test_swagger_ui_uses_local_assets(tmp_path: Path):
+    """NFR-010, NFR-012: /docs works without loading assets from external CDNs."""
+    static = tmp_path / "static"
+    (static / "swagger").mkdir(parents=True)
+    (static / "index.html").write_text("<html>index</html>")
+    (static / "swagger" / "swagger-ui-bundle.js").write_text("// bundle")
+    client = TestClient(create_app(Settings(static_dir=static)))
+    html = client.get("/docs").text
+    assert "/swagger/swagger-ui-bundle.js" in html
+    assert "/swagger/swagger-ui.css" in html
+    assert "http://" not in html and "https://" not in html
+    assert "cdn.jsdelivr" not in client.get("/redoc").text
+
+
+def test_frontend_build_references_no_external_assets():
+    """NFR-012: the built frontend loads no scripts, styles or fonts from other hosts."""
+    dist = Path(__file__).parents[2] / "frontend" / "dist"
+    if not (dist / "index.html").is_file():
+        pytest.skip("frontend not built")
+    html = (dist / "index.html").read_text()
+    assert "http://" not in html and "https://" not in html
+    for css in (dist / "assets").glob("*.css"):
+        assert "url(http" not in css.read_text().replace(" ", ""), css.name

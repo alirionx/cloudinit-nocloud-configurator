@@ -7,7 +7,8 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from app import health, images
 from app.api import configurations, defaults, parse, preview
@@ -51,7 +52,14 @@ def create_app(settings: Settings | None = None, repository: Repository | None =
         finally:
             await repo.close()
 
-    app = FastAPI(title="cloudinit-nocloud-configurator", version="0.1.0", lifespan=lifespan)
+    # The docs are served by `_add_docs` (local assets, NFR-012); ReDoc is disabled.
+    app = FastAPI(
+        title="cloudinit-nocloud-configurator",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
+    )
     app.state.settings = settings
     app.state.readiness_checks = {}
     app.include_router(health.router)
@@ -60,6 +68,7 @@ def create_app(settings: Settings | None = None, repository: Repository | None =
     app.include_router(defaults.router)
     app.include_router(parse.router)
     _add_error_handlers(app)
+    _add_docs(app, settings.static_dir)
     if settings.static_dir is not None:
         # Registered last so that API and health routes take precedence.
         _mount_frontend(app, settings.static_dir)
@@ -70,6 +79,28 @@ async def _check_image_tools() -> None:
     """FR-002: seed images can only be built if all image tools are installed."""
     if missing := images.missing_tools():
         raise RuntimeError(f"missing image tools: {', '.join(missing)}")
+
+
+def _add_docs(app: FastAPI, static_dir: Path | None) -> None:
+    """NFR-010: Swagger UI at /docs. NFR-012: its assets come from the built frontend
+    (copied from swagger-ui-dist), not from a CDN."""
+    local = static_dir is not None and (static_dir / "swagger" / "swagger-ui-bundle.js").is_file()
+    if not local:
+        logger.warning("Swagger UI assets not found in STATIC_DIR; /docs loads them from a CDN")
+
+    @app.get("/docs", include_in_schema=False)
+    async def docs() -> HTMLResponse:
+        if not local:
+            return get_swagger_ui_html(openapi_url="/openapi.json", title=f"{app.title} - API")
+        return get_swagger_ui_html(
+            openapi_url="/openapi.json",
+            title=f"{app.title} - API",
+            swagger_js_url="/swagger/swagger-ui-bundle.js",
+            swagger_css_url="/swagger/swagger-ui.css",
+            swagger_favicon_url="/favicon.svg",
+            # The validator badge would load an image from validator.swagger.io.
+            swagger_ui_parameters={"validatorUrl": None},
+        )
 
 
 def _add_error_handlers(app: FastAPI) -> None:

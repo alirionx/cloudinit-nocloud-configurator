@@ -52,6 +52,7 @@ Debian 13), used under Apache-2.0 (cloud-init is dual-licensed GPL-3 / Apache-2.
 | @codemirror/state, view, commands, language, lint | Code editor with line numbers and error markers (FR-008, FR-013, FR-014) | MIT | CodeMirror (Marijn Haverbeke, Adrian Heine) |
 | @codemirror/lang-yaml, lang-json, legacy-modes | Syntax highlighting for YAML, JSON, shell, ini/conf, TOML, Python (FR-008) | MIT | CodeMirror |
 | @codemirror/theme-one-dark | Dark editor theme (FR-016) | MIT | CodeMirror |
+| swagger-ui-dist | Swagger UI for /docs, served locally instead of from a CDN (NFR-010, NFR-012); copied to `dist/swagger/` at build time | Apache-2.0 | SmartBear (swagger-api) |
 
 Notes on the selection:
 

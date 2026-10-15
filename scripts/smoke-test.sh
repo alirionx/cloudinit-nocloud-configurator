@@ -122,6 +122,13 @@ echo "==> Section 8.1: frontend is served"
 curl -sf "http://127.0.0.1:$PORT/" | grep -q '<div id="app">'
 echo "ok"
 
+echo "==> NFR-010 / NFR-012: Swagger UI without external assets"
+docs="$(curl -sf "http://127.0.0.1:$PORT/docs")"
+echo "$docs" | grep -q '/swagger/swagger-ui-bundle.js' || { echo "FAIL: local Swagger UI missing"; exit 1; }
+! echo "$docs" | grep -qE 'https?://' || { echo "FAIL: /docs references external hosts"; exit 1; }
+curl -sf -o /dev/null "http://127.0.0.1:$PORT/swagger/swagger-ui-bundle.js"
+echo "ok"
+
 echo "==> FR-001 / FR-015: configuration API (TinyDB)"
 api_round_trip "http://127.0.0.1:$PORT"
 
