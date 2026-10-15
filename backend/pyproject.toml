@@ -1,0 +1,29 @@
+[project]
+name = "cloudinit-nocloud-configurator"
+version = "0.1.0"
+description = "Web app to build cloud-init NoCloud seed drives"
+license = "MIT"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.143.2",
+    "pydantic-settings>=2.16.0",
+    "uvicorn>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13.1",
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
