@@ -41,6 +41,22 @@ maintainer (LIB-003).
 | Package | Purpose | License | Maintained by |
 |---------|---------|---------|---------------|
 | vue | UI framework (section 8.1) | MIT | Vue.js team |
+| vue-router | Routing between list (UI-02) and editor (UI-01) | MIT | Vue.js team |
+| vuetify | Component library with light/dark themes (section 7.2, FR-016) | MIT | Vuetify LLC |
+| @lucide/vue | Icons | ISC | Lucide (lucide-icons organization) |
+| @codemirror/state, view, commands, language, lint | Code editor with line numbers and error markers (FR-008, FR-013, FR-014) | MIT | CodeMirror (Marijn Haverbeke, Adrian Heine) |
+| @codemirror/lang-yaml, lang-json, legacy-modes | Syntax highlighting for YAML, JSON, shell, ini/conf, TOML, Python (FR-008) | MIT | CodeMirror |
+| @codemirror/theme-one-dark | Dark editor theme (FR-016) | MIT | CodeMirror |
+
+Notes on the selection:
+
+- **PrimeVue was rejected:** since version 5 PrimeVue, PrimeIcons and @primeuix/themes are
+  released under the commercial "PrimeUI License" (free tier with restrictions), which is not
+  an OSI-approved license (LIB-001).
+- **Icons:** `@mdi/js` was rejected (own non-OSI license, no release since 2023, LIB-001/002).
+  Vuetify's built-in icons use its embedded `mdi-svg` set; app icons come from Lucide.
+- **CodeMirror** is published by one npm account, but has a second regular committer on
+  GitHub and very broad usage (LIB-003). Monaco was not chosen because of its size.
 
 ## JavaScript development
 
@@ -48,10 +64,18 @@ maintainer (LIB-003).
 |---------|---------|---------|---------------|
 | vite | Build tool and dev server | MIT | Vite team (VoidZero) |
 | @vitejs/plugin-vue | Vue single-file component support for Vite | MIT | Vite team |
+| vite-plugin-vuetify | Tree-shaking and auto-import of Vuetify components | MIT | Vuetify LLC |
 | typescript | Type checking | Apache-2.0 | Microsoft |
 | vue-tsc | Type checking of `.vue` files | MIT | Vue.js team |
 | @vue/tsconfig | Shared TypeScript config for Vue | MIT | Vue.js team |
 | @types/node | Node.js type definitions for the Vite config | MIT | DefinitelyTyped |
+| vitest | Unit tests | MIT | Vitest team (VoidZero) |
+| jsdom | DOM environment for unit tests | MIT | jsdom organization |
+| @playwright/test | End-to-end tests in a real browser | Apache-2.0 | Microsoft |
+| @axe-core/playwright | Automated WCAG contrast checks in end-to-end tests (FR-016, NFR-013) | MPL-2.0 | Deque Systems |
+
+`@axe-core/playwright` (MPL-2.0, file-level copyleft) is only used in tests and is not
+distributed with the application.
 
 ## Container image
 
@@ -59,6 +83,7 @@ maintainer (LIB-003).
 |-----------|---------|---------|--------|
 | `python:3.13-alpine` | Runtime base image | PSF-2.0 (Python), MIT (Alpine base) | Docker Official Images |
 | `node:24-alpine` | Frontend build stage only, not in the final image | MIT | Docker Official Images |
+| openssl | SHA-512-crypt password hashing via `openssl passwd -6` (FR-010) | Apache-2.0 | Alpine repository (OpenSSL project) |
 | `couchdb:3` | Tests only: contract tests and smoke test (DS-007); not part of the app image | Apache-2.0 | Docker Official Images (Apache CouchDB) |
 | xorriso | ISO 9660 seed image (FR-002) | GPL-3.0-or-later | Alpine repository (GNU xorriso) |
 | dosfstools | `mkfs.vfat` for RAW seed images (FR-002) | GPL-3.0-or-later | Alpine repository |

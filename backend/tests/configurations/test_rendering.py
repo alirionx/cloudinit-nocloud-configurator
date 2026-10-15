@@ -3,6 +3,8 @@ import yaml
 from app.configurations.model import Basics, Configuration
 from app.configurations.rendering import render_files, to_yaml
 
+SECURE_SSH = {"ssh_pwauth": False, "disable_root": True}
+
 FULL = Configuration(
     name="Web server",
     basics=Basics(
@@ -32,6 +34,7 @@ def test_user_data_is_cloud_config_with_basics():
         "fqdn": "web-01.example.com",
         "timezone": "Europe/Berlin",
         "locale": "de_DE.UTF-8",
+        **SECURE_SSH,
     }
 
 
@@ -40,14 +43,22 @@ def test_exact_output():
     files = render_files(FULL)
     assert files["meta-data"] == "instance-id: iid-web-01-12345678\nlocal-hostname: web-01\n"
     assert files["user-data"] == (
-        "#cloud-config\nfqdn: web-01.example.com\ntimezone: Europe/Berlin\nlocale: de_DE.UTF-8\n"
+        "#cloud-config\n"
+        "fqdn: web-01.example.com\n"
+        "timezone: Europe/Berlin\n"
+        "locale: de_DE.UTF-8\n"
+        "ssh_pwauth: false\n"
+        "disable_root: true\n"
     )
 
 
 def test_empty_section_produces_no_keys():
-    """FR-004: given an empty section, the YAML contains no keys for that section."""
+    """FR-004: given empty sections, the YAML contains no keys for them.
+
+    Only the SSH security settings are always written (FR-011 secure defaults).
+    """
     files = render_files(Configuration(name="empty", basics=Basics(instance_id="iid-1")))
-    assert files["user-data"] == "#cloud-config\n{}\n"
+    assert yaml.safe_load(files["user-data"]) == SECURE_SSH
     assert yaml.safe_load(files["meta-data"]) == {"instance-id": "iid-1"}
 
 

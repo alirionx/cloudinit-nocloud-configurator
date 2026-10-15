@@ -6,10 +6,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
 from app import health, images
-from app.api import configurations
+from app.api import configurations, defaults, preview
+from app.configurations.sections.users import PasswordHashingError
+from app.configurations.service import ConfigurationInvalidError
 from app.repository import (
     ConflictError,
     DatastoreUnavailableError,
@@ -52,6 +55,8 @@ def create_app(settings: Settings | None = None, repository: Repository | None =
     app.state.readiness_checks = {}
     app.include_router(health.router)
     app.include_router(configurations.router)
+    app.include_router(preview.router)
+    app.include_router(defaults.router)
     _add_error_handlers(app)
     if settings.static_dir is not None:
         # Registered last so that API and health routes take precedence.
@@ -67,6 +72,36 @@ async def _check_image_tools() -> None:
 
 def _add_error_handlers(app: FastAPI) -> None:
     """Map backend-independent repository errors to HTTP responses."""
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
+        """FR-004: field-level errors. Submitted values are never echoed back, because
+        they may contain secrets such as plain-text passwords (FR-010, NFR-007)."""
+        detail = [
+            {
+                "loc": list(error["loc"]),
+                "msg": str(error["msg"]).removeprefix("Value error, "),
+                "type": error["type"],
+            }
+            for error in exc.errors()
+        ]
+        return JSONResponse(status_code=422, content={"detail": detail})
+
+    @app.exception_handler(ConfigurationInvalidError)
+    async def invalid_configuration(
+        request: Request, exc: ConfigurationInvalidError
+    ) -> JSONResponse:
+        """Cross-field errors, in the same format as field validation errors."""
+        detail = [
+            {"loc": ["body", *issue.loc], "msg": issue.msg, "type": "value_error"}
+            for issue in exc.issues
+        ]
+        return JSONResponse(status_code=422, content={"detail": detail})
+
+    @app.exception_handler(PasswordHashingError)
+    async def hashing_failed(request: Request, exc: PasswordHashingError) -> JSONResponse:
+        logger.error("Password hashing failed: %s", exc)
+        return JSONResponse(status_code=500, content={"detail": "Password hashing failed."})
 
     @app.exception_handler(NotFoundError)
     async def not_found(request: Request, exc: NotFoundError) -> JSONResponse:

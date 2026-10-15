@@ -66,6 +66,10 @@ api_round_trip() {
   [ -n "$id" ] || { echo "FAIL: could not create a configuration"; return 1; }
   curl -sf "$1/api/configurations/$id/files" | grep -q 'local-hostname: smoke-01' \
     || { echo "FAIL: rendered meta-data is wrong"; return 1; }
+  # FR-010: plain-text passwords are hashed in the container (openssl).
+  curl -sf -X POST "$1/api/preview" -H 'content-type: application/json' \
+    -d '{"name":"pw","users":{"users":[{"name":"alice","password":"smoke-secret"}]}}' \
+    | grep -q 'passwd: \$6\$' || { echo "FAIL: password hashing"; return 1; }
   for format in iso raw qcow2; do
     curl -sf -D - -o /dev/null "$1/api/configurations/$id/image?format=$format" \
       | grep -qi "content-disposition: attachment" \

@@ -9,8 +9,9 @@ from datetime import datetime
 from typing import Annotated, Self
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
+from app.api.preview import PreviewResponse, RenderedFiles, preview_of
 from app.configurations.model import Configuration
 from app.configurations.rendering import render_files
 from app.configurations.service import ConfigurationService, SortKey, StoredConfiguration
@@ -55,9 +56,9 @@ class ConfigurationUpdate(Configuration):
     modified_at: datetime | None = Field(default=None, description="Read-only; ignored.")
 
     def configuration(self) -> Configuration:
-        return Configuration.model_validate(
-            self.model_dump(exclude={"revision", "id", "created_at", "modified_at"})
-        )
+        # Built from the validated values, not via model_dump(): dumping would drop
+        # write-only fields such as new plain-text passwords (FR-010).
+        return Configuration(**{name: getattr(self, name) for name in Configuration.model_fields})
 
 
 class ConfigurationSummary(BaseModel):
@@ -78,17 +79,6 @@ class ConfigurationSummary(BaseModel):
             created_at=stored.created_at,
             modified_at=stored.modified_at,
         )
-
-
-class RenderedFiles(BaseModel):
-    """The NoCloud files; `null` for optional files without content."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    user_data: str = Field(alias="user-data")
-    meta_data: str = Field(alias="meta-data")
-    network_config: str | None = Field(alias="network-config")
-    vendor_data: str | None = Field(alias="vendor-data")
 
 
 def _created(stored: StoredConfiguration, response: Response) -> ConfigurationResponse:
@@ -160,6 +150,12 @@ async def get_files(configuration_id: str, service: Service) -> RenderedFiles:
     """The rendered NoCloud files of a saved configuration (FR-001)."""
     stored = await service.get(configuration_id)
     return RenderedFiles.model_validate(render_files(stored.configuration))
+
+
+@router.get("/{configuration_id}/preview")
+async def get_preview(configuration_id: str, service: Service) -> PreviewResponse:
+    """Files and warnings of a saved configuration (FR-013)."""
+    return preview_of((await service.get(configuration_id)).configuration)
 
 
 @router.get(

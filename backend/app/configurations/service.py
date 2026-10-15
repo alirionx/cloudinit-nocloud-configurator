@@ -8,7 +8,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
+from app.configurations.checks import Issue, check
 from app.configurations.model import NAME_MAX_LENGTH, Configuration, suggest_instance_id
+from app.configurations.sections.users import hash_password
 from app.repository import Document, Repository
 
 SortKey = Literal["name", "-name", "modified_at", "-modified_at", "created_at", "-created_at"]
@@ -48,14 +50,14 @@ class ConfigurationService:
         return _from_document(await self._repository.get(configuration_id))
 
     async def create(self, configuration: Configuration) -> StoredConfiguration:
-        document = await self._repository.create(_to_data(_with_instance_id(configuration)))
+        document = await self._repository.create(_to_data(prepare_for_save(configuration)))
         return _from_document(document)
 
     async def update(
         self, configuration_id: str, configuration: Configuration, revision: str
     ) -> StoredConfiguration:
         document = await self._repository.update(
-            configuration_id, _to_data(_with_instance_id(configuration)), revision
+            configuration_id, _to_data(prepare_for_save(configuration)), revision
         )
         return _from_document(document)
 
@@ -73,14 +75,47 @@ class ConfigurationService:
         return await self.create(copy)
 
 
-def _with_instance_id(configuration: Configuration) -> Configuration:
-    """FR-005: suggest an instance-id when none was entered."""
-    if configuration.basics.instance_id:
-        return configuration
-    basics = configuration.basics.model_copy(
-        update={"instance_id": suggest_instance_id(configuration.basics.hostname)}
-    )
-    return configuration.model_copy(update={"basics": basics})
+class ConfigurationInvalidError(Exception):
+    """Cross-field rules are violated (see `checks`); maps to HTTP 422."""
+
+    def __init__(self, issues: list[Issue]) -> None:
+        super().__init__(f"{len(issues)} invalid field(s)")
+        self.issues = issues
+
+
+def prepare_for_save(configuration: Configuration) -> Configuration:
+    """Complete and check a configuration before it is stored, previewed or rendered.
+
+    - FR-005: suggest an instance-id when none was entered.
+    - FR-010: hash plain-text passwords; the plain text is discarded (NFR-007).
+    - Cross-field errors raise `ConfigurationInvalidError`.
+    """
+    config = configuration
+    if not config.basics.instance_id:
+        basics = config.basics.model_copy(
+            update={"instance_id": suggest_instance_id(config.basics.hostname)}
+        )
+        config = config.model_copy(update={"basics": basics})
+
+    if any(user.password for user in config.users.users):
+        users = [
+            user.model_copy(
+                update={
+                    "password_hash": hash_password(user.password.get_secret_value()),
+                    "password": None,
+                }
+            )
+            if user.password
+            else user
+            for user in config.users.users
+        ]
+        config = config.model_copy(
+            update={"users": config.users.model_copy(update={"users": users})}
+        )
+
+    if errors := check(config).errors:
+        raise ConfigurationInvalidError(errors)
+    return config
 
 
 def _to_data(configuration: Configuration) -> dict:

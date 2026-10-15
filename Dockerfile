@@ -21,9 +21,10 @@ RUN uv sync --locked --no-dev --no-install-project
 
 # Stage 3: runtime image.
 FROM python:3.13-alpine
-# Image tools for seed drive generation without root or mounts (NFR-002, FR-002).
+# Image tools for seed drive generation without root or mounts (NFR-002, FR-002)
+# and openssl for SHA-512-crypt password hashing (FR-010).
 RUN apk upgrade --no-cache \
-    && apk add --no-cache xorriso dosfstools mtools qemu-img \
+    && apk add --no-cache xorriso dosfstools mtools qemu-img openssl \
     && addgroup -S -g 10001 app \
     && adduser -S -D -H -u 10001 -G app app
 
