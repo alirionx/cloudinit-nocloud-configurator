@@ -24,6 +24,19 @@ file. The manifests are generated from the Helm chart; do not edit them by hand 
 
 ## Helm chart
 
+From a GitHub release (DEP-009), without cloning the repository:
+
+```sh
+helm install cnc \
+  https://github.com/alirionx/cloudinit-nocloud-configurator/releases/download/chart-v0.1.0/cloudinit-nocloud-configurator-0.1.0.tgz \
+  -n cloudinit --create-namespace
+```
+
+Released charts use the image tag `main`, i.e. the latest build of the main branch. For a
+reproducible installation pin the image: `--set image.tag=sha-<commit>` (R-10).
+
+From the repository:
+
 ```sh
 helm install cnc deploy/helm/cloudinit-nocloud-configurator -n cloudinit --create-namespace
 ```
@@ -100,6 +113,13 @@ ingress:
 | `commonLabels`, `podLabels`, `podAnnotations` | – | |
 
 See `values.yaml` for all options.
+
+## Releasing the chart
+
+`.github/workflows/chart-release.yml` runs on every push to `main` that changes the chart. If the
+`version` in `Chart.yaml` has no release yet, it lints and packages the chart and creates the
+GitHub release `chart-v<version>` with the `.tgz` and its SHA-256 checksum. To publish chart
+changes, bump `version` in `Chart.yaml` (semantic versioning) in the same commit.
 
 ## Maintaining the manifests
 

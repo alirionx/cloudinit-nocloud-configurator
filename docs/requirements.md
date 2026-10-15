@@ -1,7 +1,7 @@
 # Requirements Specification: cloudinit-nocloud-configurator
 
 > **Status:** MVP implemented (steps 1–8)
-> **Version:** 0.21
+> **Version:** 0.22
 > **Last updated:** 2026-10-15
 > **Owner:** Daniel Quilitzsch
 
@@ -26,6 +26,7 @@
 | 0.13    | 2026-10-15 | App name set: cloudinit-nocloud-configurator | Claude |
 | 0.14    | 2026-10-15 | OQ-09 decided: Debian as target OS of the VMs; FR-007, FR-010, assumptions and R-06 updated | Claude |
 | 0.15    | 2026-10-15 | Problem statement (1.2) refined; NFR-015/NFR-016 on established, actively maintained open-source libraries added (criteria in 8.5); R-08 added; `genisoimage` removed | Claude |
+| 0.22    | 2026-10-15 | DEP-009 (Helm chart as GitHub release artifact, version from `Chart.yaml`, image tag `main`) and DEP-010 (container image on ghcr.io, already implemented) added; R-10 added | Claude |
 | 0.21    | 2026-10-15 | Step 8: Helm chart and generated manifests implemented (DEP-001 to DEP-008); verified in a kind cluster (`scripts/kind-test.sh`) | Claude |
 | 0.20    | 2026-10-15 | DEP-003 changed by the product owner: bundled CouchDB as own StatefulSet (1 replica, PVC) instead of the Apache CouchDB subchart; generated credentials stable across upgrades. Chart default image `ghcr.io/alirionx/cloudinit-nocloud-configurator:main` (pullPolicy Always) | Daniel Quilitzsch |
 | 0.19    | 2026-10-15 | DS-008 implemented: `compose.yaml` (CouchDB + app built on start, hardened like in Kubernetes) | Claude |
@@ -491,6 +492,8 @@ There are two delivery paths (OQ-05):
 | DEP-006 | The Helm chart optionally supports Ingress (including annotations for upstream authentication, e.g. Basic Auth or OAuth2 Proxy), resource limits, SecurityContext (non-root, read-only root filesystem, NFR-002), labels/annotations and image tag. _Implemented (v0.21)._ | Should |
 | DEP-007 | The manifests are generated from the Helm chart with default values (`helm template`) so both paths do not drift apart; a CI check ensures the committed manifests are up to date. _Implemented (v0.21): `deploy/generate-manifests.sh --check` in CI._ | Should |
 | DEP-008 | The Helm chart is checked with `helm lint`. _Implemented (v0.21): `helm lint --strict` in CI._ | Should |
+| DEP-009 | The Helm chart is published as a release artifact: on every push to `main`, if the version in `Chart.yaml` has no release yet, the chart is linted, packaged (`cloudinit-nocloud-configurator-<version>.tgz` plus SHA-256 checksum) and attached to a new GitHub release with the tag `chart-v<version>`. Chart changes that should be released require a version bump in `Chart.yaml`. The released chart keeps the image tag `main` (see R-10). _Implemented (v0.22): `.github/workflows/chart-release.yml`._ | Should |
+| DEP-010 | The container image is built on every push to `main` and published to the GitHub Container Registry as `ghcr.io/alirionx/cloudinit-nocloud-configurator:main` plus an immutable tag `sha-<commit>`. _Implemented (v0.22): `.github/workflows/docker-image.yml`._ | Should |
 
 ### 8.5 Selection of Libraries and Tools
 
@@ -532,6 +535,7 @@ Every dependency (Python, JavaScript, system packages in the container) must mee
 | R-06 | Package names and commands are distribution-specific | Configuration does not work as expected on distributions other than Debian | Debian as fixed target (OQ-09); UI presets and hints aligned with Debian; acceptance test with a Debian cloud image |
 | R-07 | Manifests and Helm chart are maintained separately and drift apart | Default setup behaves differently from the chart | Generate manifests from the chart and check in CI (DEP-007) |
 | R-09 | cloud-init's JSON schema rejects valid settings (numeric `fs_setup` partitions, FR-012) | cloud-init logs a schema warning at boot although the configuration works | Known false positive filtered in the app's schema check; behavior verified by booting Debian 13 (`scripts/boot-test.sh`); revisit when cloud-init fixes its schema |
+| R-10 | Released charts (DEP-009) point to the moving image tag `main` | A chart release installs whatever `main` currently is; not reproducible, a later push can change a running setup on pod restart | For reproducible installs set `image.tag=sha-<commit>` (DEP-010); introduce versioned image tags when releases become relevant |
 | R-08 | A library in use is no longer maintained | Security issues, incompatibilities, costly migration | Selection criteria (8.5), DB abstraction (NFR-009) and regular dependency reviews (NFR-016, LIB-006) |
 
 ---

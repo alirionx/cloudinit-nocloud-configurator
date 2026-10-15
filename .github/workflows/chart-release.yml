@@ -1,0 +1,93 @@
+# Publishes the Helm chart as a GitHub release artifact (DEP-009).
+#
+# On every push to main that touches the chart: if the version in Chart.yaml has no release
+# yet, the chart is linted, packaged and attached to a new release "chart-v<version>".
+# To release chart changes, bump `version` in Chart.yaml.
+name: Helm chart release
+
+on:
+  push:
+    branches: [main]
+    paths: ["deploy/helm/**", ".github/workflows/chart-release.yml"]
+  workflow_dispatch:
+
+# Releases are created one after another, never in parallel.
+concurrency:
+  group: chart-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  CHART: deploy/helm/cloudinit-nocloud-configurator
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v3.19.0
+
+      - name: Determine version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(helm show chart "$CHART" | awk '/^version:/ {print $2}')"
+          tag="chart-v${version}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Release $tag already exists. Bump 'version' in Chart.yaml to publish chart changes."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lint
+        if: steps.version.outputs.exists == 'false'
+        run: helm lint "$CHART" --strict
+
+      - name: Package
+        if: steps.version.outputs.exists == 'false'
+        id: package
+        run: |
+          mkdir -p dist
+          helm package "$CHART" --destination dist
+          cd dist
+          file="$(ls ./*.tgz)"
+          sha256sum "${file#./}" > "${file#./}.sha256"
+          echo "file=dist/${file#./}" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        if: steps.version.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          FILE: ${{ steps.package.outputs.file }}
+        run: |
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          cat > notes.md <<NOTES
+          Helm chart \`cloudinit-nocloud-configurator\` ${VERSION}.
+
+          Install directly from this release:
+
+          \`\`\`sh
+          helm install cnc ${base}/$(basename "$FILE") -n cloudinit --create-namespace
+          \`\`\`
+
+          The chart uses the image \`ghcr.io/${GITHUB_REPOSITORY}:main\`. For a reproducible
+          installation pin it with \`--set image.tag=sha-${GITHUB_SHA::7}\` (R-10).
+          See deploy/README.md for all options.
+          NOTES
+          gh release create "$TAG" "$FILE" "$FILE.sha256" \
+            --title "Helm chart ${VERSION}" \
+            --notes-file notes.md \
+            --target "$GITHUB_SHA"

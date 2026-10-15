@@ -103,7 +103,9 @@ scripts/kind-test.sh                   # all variants in a throwaway kind cluste
 
 CI: `.github/workflows/docker-image.yml` builds the image on every push to `main` and pushes
 `ghcr.io/alirionx/cloudinit-nocloud-configurator:main` (plus `:sha-<commit>`);
-`.github/workflows/helm.yml` lints the chart and checks the generated manifests.
+`.github/workflows/helm.yml` lints the chart and checks the generated manifests;
+`.github/workflows/chart-release.yml` publishes the chart as GitHub release `chart-v<version>` when
+the `version` in `Chart.yaml` is new (DEP-009): bump it to release chart changes.
 
 Acceptance test with a real VM (FR-002): boots the Debian 13 cloud image with seeds in all three
 formats (QEMU/KVM + OVMF, sudo if not in group kvm) and checks what cloud-init applied:
