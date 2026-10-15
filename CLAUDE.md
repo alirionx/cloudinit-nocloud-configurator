@@ -74,7 +74,8 @@ npm run build         # type check + production build to dist/
 Container, run in the repository root:
 
 ```sh
-docker build -t cloudinit-nocloud-configurator .
-docker run --rm -p 8000:8000 cloudinit-nocloud-configurator
-scripts/smoke-test.sh   # build + non-root, image tools, read-only rootfs, health endpoints
+buildah bud --layers --format docker -t cloudinit-nocloud-configurator .   # or: docker build
+docker run --rm -p 8000:8000 cloudinit-nocloud-configurator                # needs docker or podman
+scripts/smoke-test.sh   # build + non-root, seed image tools, read-only rootfs, health endpoints
+ENGINE=buildah scripts/smoke-test.sh   # local default here (no docker/podman); skips read-only rootfs check
 ```
