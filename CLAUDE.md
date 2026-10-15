@@ -85,6 +85,13 @@ scripts/smoke-test.sh   # build + non-root, seed image tools, read-only rootfs, 
 ENGINE=buildah scripts/smoke-test.sh   # without docker/podman; skips read-only rootfs and CouchDB checks
 ```
 
+Local test stack with CouchDB (DS-008), image built on start; settings in `.env` (see `.env.example`):
+
+```sh
+docker compose up --build        # app on :8080, CouchDB/Fauxton on 127.0.0.1:5984
+docker compose down -v           # stop and delete the CouchDB data
+```
+
 Acceptance test with a real VM (FR-002): boots the Debian 13 cloud image with seeds in all three
 formats (QEMU/KVM + OVMF, sudo if not in group kvm) and checks what cloud-init applied:
 

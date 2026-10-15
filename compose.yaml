@@ -1,0 +1,58 @@
+# Local test setup with CouchDB (DS-008).
+#
+#   cp .env.example .env        # optional: adjust credentials and ports
+#   docker compose up --build   # builds the app image and starts CouchDB + app
+#
+# App:     http://localhost:8080          (APP_PORT)
+# Swagger: http://localhost:8080/docs
+# CouchDB: http://localhost:5984/_utils   (Fauxton, COUCHDB_PORT; bound to localhost only)
+#
+# Data is kept in the volume "couchdb-data"; `docker compose down -v` removes it.
+
+name: cloudinit-nocloud-configurator
+
+services:
+  couchdb:
+    image: couchdb:3
+    environment:
+      COUCHDB_USER: ${COUCHDB_USER:-admin}
+      COUCHDB_PASSWORD: ${COUCHDB_PASSWORD:-change-me}
+    volumes:
+      - couchdb-data:/opt/couchdb/data
+    ports:
+      - "127.0.0.1:${COUCHDB_PORT:-5984}:5984"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:5984/_up"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build: .
+    image: cloudinit-nocloud-configurator:compose
+    depends_on:
+      couchdb:
+        condition: service_healthy
+    environment:
+      DATASTORE_BACKEND: couchdb
+      COUCHDB_URL: http://couchdb:5984
+      COUCHDB_USER: ${COUCHDB_USER:-admin}
+      COUCHDB_PASSWORD: ${COUCHDB_PASSWORD:-change-me}
+      COUCHDB_DATABASE: ${COUCHDB_DATABASE:-cloudinit}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${APP_PORT:-8080}:8000"
+    # Hardened like in Kubernetes (NFR-002, NFR-005): read-only root filesystem,
+    # temporary files only in /tmp, no Linux capabilities.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  couchdb-data:

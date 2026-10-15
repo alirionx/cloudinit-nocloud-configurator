@@ -16,3 +16,6 @@ data/
 .idea/
 .DS_Store
 *.log
+
+# Local compose settings (credentials)
+.env

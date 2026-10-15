@@ -9,3 +9,6 @@ data
 docs
 deploy
 scripts
+compose.yaml
+.env
+.env.example
