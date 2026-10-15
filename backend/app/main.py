@@ -1,17 +1,43 @@
 """FastAPI application factory."""
 
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
 from app import health
+from app.repository import Repository, create_repository
 from app.settings import Settings
 
+logger = logging.getLogger(__name__)
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+
+def create_app(settings: Settings | None = None, repository: Repository | None = None) -> FastAPI:
+    """Build the app. `repository` overrides the one selected by the settings (tests)."""
     settings = settings or Settings()
-    app = FastAPI(title="cloudinit-nocloud-configurator", version="0.1.0")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # An unusable datastore configuration aborts startup here (DS-004).
+        repo = repository or create_repository(settings)
+        app.state.repository = repo
+        health.register_readiness_check(app, "datastore", repo.check)
+        if settings.datastore_backend == "tinydb" and repository is None:
+            logger.warning("TinyDB datastore active: run exactly one replica and one worker (R-02)")
+        try:
+            await repo.check()
+        except Exception as exc:
+            # Not fatal: the datastore may become available later; /readyz reports it.
+            logger.warning("Datastore not ready at startup: %s", type(exc).__name__)
+        try:
+            yield
+        finally:
+            await repo.close()
+
+    app = FastAPI(title="cloudinit-nocloud-configurator", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.readiness_checks = {}
     app.include_router(health.router)

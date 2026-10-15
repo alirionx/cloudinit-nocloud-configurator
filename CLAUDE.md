@@ -56,7 +56,9 @@ Backend (Python 3.13, managed with [uv](https://docs.astral.sh/uv/)), run in `ba
 
 ```sh
 uv sync                                    # install dependencies from uv.lock
-uv run pytest                              # tests
+uv run pytest                              # tests; CouchDB contract tests start a couchdb:3
+                                           # container via Docker, or use COUCHDB_TEST_URL/_USER/_PASSWORD;
+                                           # skipped without either (COUCHDB_TEST_REQUIRED=1 makes them fail)
 uv run ruff check . && uv run ruff format --check .   # lint
 uv run python -m app                       # run API on :8000 (config via env vars, NFR-003)
 STATIC_DIR=../frontend/dist uv run python -m app      # also serve the built frontend
@@ -76,6 +78,6 @@ Container, run in the repository root:
 ```sh
 buildah bud --layers --format docker -t cloudinit-nocloud-configurator .   # or: docker build
 docker run --rm -p 8000:8000 cloudinit-nocloud-configurator                # needs docker or podman
-scripts/smoke-test.sh   # build + non-root, seed image tools, read-only rootfs, health endpoints
-ENGINE=buildah scripts/smoke-test.sh   # without docker/podman; skips the read-only rootfs check
+scripts/smoke-test.sh   # build + non-root, seed image tools, read-only rootfs, health, TinyDB + CouchDB
+ENGINE=buildah scripts/smoke-test.sh   # without docker/podman; skips read-only rootfs and CouchDB checks
 ```

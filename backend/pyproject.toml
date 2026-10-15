@@ -5,14 +5,16 @@ description = "Web app to build cloud-init NoCloud seed drives"
 license = "MIT"
 requires-python = ">=3.13"
 dependencies = [
+    "anyio>=4.15.1",
     "fastapi>=0.143.2",
+    "httpx2>=2.13.1",
     "pydantic-settings>=2.16.0",
+    "tinydb>=4.9.0",
     "uvicorn>=0.54.0",
 ]
 
 [dependency-groups]
 dev = [
-    "httpx2>=2.13.1",
     "pytest>=9.1.1",
     "ruff>=0.17.1",
 ]

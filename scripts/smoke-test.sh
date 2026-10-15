@@ -1,8 +1,9 @@
 #!/usr/bin/env sh
-# Container smoke test: builds the image and checks NFR-001, NFR-002, NFR-004 and NFR-005.
+# Container smoke test: builds the image and checks NFR-001, NFR-002, NFR-004, NFR-005,
+# DS-005 and DS-006 (TinyDB and CouchDB backends).
 #
 # Container engine: ENGINE=docker|podman|buildah (default: first working one found).
-# With buildah there is no read-only root filesystem; that check is skipped.
+# With buildah, the read-only root filesystem and CouchDB checks are skipped.
 set -eu
 
 IMAGE="${IMAGE:-localhost/cloudinit-nocloud-configurator:smoke-test}"
@@ -57,7 +58,17 @@ run_in_image sh -euc '
 '
 echo "ok"
 
-echo "==> NFR-002 / NFR-005: starting the app"
+# wait_for <url>: poll until the URL answers with HTTP 2xx (max. 60 s).
+wait_for() {
+  for _ in $(seq 1 60); do
+    curl -sf "$1" >/dev/null && return 0
+    sleep 1
+  done
+  echo "FAIL: $1 did not become available"
+  return 1
+}
+
+echo "==> NFR-002 / NFR-005: starting the app (TinyDB)"
 if [ "$ENGINE" = "buildah" ]; then
   echo "note: buildah cannot enforce a read-only root filesystem; check skipped"
   ctr="$(buildah from -q "$IMAGE")"
@@ -67,25 +78,47 @@ if [ "$ENGINE" = "buildah" ]; then
     buildah rm "$ctr" >/dev/null 2>&1 || true
   }
 else
-  name="cnc-smoke-test-$$"
-  "$ENGINE" run -d --name "$name" --read-only --tmpfs /tmp \
+  suffix="cnc-smoke-test-$$"
+  cleanup() {
+    "$ENGINE" rm -f "$suffix-tinydb" "$suffix-couchdb-app" "$suffix-couchdb" >/dev/null 2>&1 || true
+    "$ENGINE" network rm "$suffix" >/dev/null 2>&1 || true
+  }
+  # Read-only root filesystem; /app/data stands in for the PersistentVolumeClaim (DEP-001).
+  "$ENGINE" run -d --name "$suffix-tinydb" --read-only --tmpfs /tmp \
+    --tmpfs /app/data:uid=10001,gid=10001 \
     --cap-drop ALL --security-opt no-new-privileges \
     -p "127.0.0.1:$PORT:8000" "$IMAGE" >/dev/null
-  cleanup() { "$ENGINE" rm -f "$name" >/dev/null 2>&1 || true; }
 fi
 trap cleanup EXIT
 
-for _ in $(seq 1 30); do
-  curl -sf "http://127.0.0.1:$PORT/healthz" >/dev/null && break
-  sleep 1
-done
+wait_for "http://127.0.0.1:$PORT/healthz"
 
-echo "==> NFR-004: health endpoints"
+echo "==> NFR-004 / DS-006: health endpoints"
 curl -sf "http://127.0.0.1:$PORT/healthz" && echo
-curl -sf "http://127.0.0.1:$PORT/readyz" && echo
+curl -sf "http://127.0.0.1:$PORT/readyz" | tee /dev/stderr | grep -q '"datastore":"ok"'
+echo
 
 echo "==> Section 8.1: frontend is served"
 curl -sf "http://127.0.0.1:$PORT/" | grep -q '<div id="app">'
 echo "ok"
+
+if [ "$ENGINE" != "buildah" ]; then
+  echo "==> DS-005 / DS-006: CouchDB backend"
+  app_port=$((PORT + 1))
+  "$ENGINE" network create "$suffix" >/dev/null
+  "$ENGINE" run -d --name "$suffix-couchdb" --network "$suffix" \
+    -e COUCHDB_USER=admin -e COUCHDB_PASSWORD=smoke-test "${COUCHDB_IMAGE:-couchdb:3}" >/dev/null
+  "$ENGINE" run -d --name "$suffix-couchdb-app" --network "$suffix" --read-only --tmpfs /tmp \
+    --cap-drop ALL --security-opt no-new-privileges \
+    -e DATASTORE_BACKEND=couchdb -e "COUCHDB_URL=http://$suffix-couchdb:5984" \
+    -e COUCHDB_USER=admin -e COUCHDB_PASSWORD=smoke-test \
+    -p "127.0.0.1:$app_port:8000" "$IMAGE" >/dev/null
+  # Becomes ready once CouchDB is up and the database has been created.
+  wait_for "http://127.0.0.1:$app_port/readyz"
+  curl -sf "http://127.0.0.1:$app_port/readyz" | tee /dev/stderr | grep -q '"datastore":"ok"'
+  echo
+else
+  echo "note: CouchDB check needs docker or podman; skipped"
+fi
 
 echo "All smoke tests passed."

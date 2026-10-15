@@ -13,15 +13,20 @@ Review this list for every release.
 | fastapi | Web framework, REST API, OpenAPI docs (NFR-010) | MIT | FastAPI organization |
 | uvicorn | ASGI server | BSD-3-Clause | Encode / Kludex |
 | pydantic-settings | Settings from environment variables (NFR-003) | MIT | Pydantic organization |
+| anyio | Runs blocking TinyDB calls in worker threads; async test support | MIT | agronholm / community |
+| tinydb | Datastore backend for development and single instances (section 8.3) | MIT | msiemens (see exceptions) |
+| httpx2 | Async HTTP client for the CouchDB API; also used by FastAPI's `TestClient` (successor of `httpx` recommended by Starlette) | BSD-3-Clause | Pydantic organization |
 
 Notable transitive dependencies: `pydantic` (MIT), `starlette` (BSD-3-Clause).
+
+CouchDB is accessed via its documented HTTP API instead of a client library: the only
+async Python client, `aiocouch`, had no release within the last 12 months (LIB-002).
 
 ## Python development
 
 | Package | Purpose | License | Maintained by |
 |---------|---------|---------|---------------|
 | pytest | Test runner | MIT | pytest-dev |
-| httpx2 | HTTP client used by FastAPI's `TestClient` (successor of `httpx` recommended by Starlette) | BSD-3-Clause | Pydantic organization |
 | ruff | Linter and formatter | MIT | Astral |
 | uv | Package manager and lock files (NFR-016); used at build time only, not in the runtime image | MIT OR Apache-2.0 | Astral |
 
@@ -48,6 +53,7 @@ Notable transitive dependencies: `pydantic` (MIT), `starlette` (BSD-3-Clause).
 |-----------|---------|---------|--------|
 | `python:3.13-alpine` | Runtime base image | PSF-2.0 (Python), MIT (Alpine base) | Docker Official Images |
 | `node:24-alpine` | Frontend build stage only, not in the final image | MIT | Docker Official Images |
+| `couchdb:3` | Tests only: contract tests and smoke test (DS-007); not part of the app image | Apache-2.0 | Docker Official Images (Apache CouchDB) |
 | xorriso | ISO 9660 seed image (FR-002) | GPL-3.0-or-later | Alpine repository (GNU xorriso) |
 | dosfstools | `mkfs.vfat` for RAW seed images (FR-002) | GPL-3.0-or-later | Alpine repository |
 | mtools | Copy files into VFAT images without mounting (FR-002, NFR-002) | GPL-3.0-or-later | Alpine repository (GNU mtools) |
@@ -61,4 +67,4 @@ application itself stays MIT-licensed (LIB-001, NFR-017).
 
 | Dependency | Criterion not met | Rationale |
 |------------|-------------------|-----------|
-| TinyDB _(added in step 2)_ | LIB-003 | See section 8.5 of `requirements.md` |
+| TinyDB | LIB-003 | See section 8.5 of `requirements.md` |
