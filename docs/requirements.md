@@ -1,7 +1,7 @@
 # Requirements Specification: cloudinit-nocloud-configurator
 
-> **Status:** MVP implemented (steps 1–7), Helm chart pending
-> **Version:** 0.19
+> **Status:** MVP implemented (steps 1–8)
+> **Version:** 0.21
 > **Last updated:** 2026-10-15
 > **Owner:** Daniel Quilitzsch
 
@@ -26,6 +26,8 @@
 | 0.13    | 2026-10-15 | App name set: cloudinit-nocloud-configurator | Claude |
 | 0.14    | 2026-10-15 | OQ-09 decided: Debian as target OS of the VMs; FR-007, FR-010, assumptions and R-06 updated | Claude |
 | 0.15    | 2026-10-15 | Problem statement (1.2) refined; NFR-015/NFR-016 on established, actively maintained open-source libraries added (criteria in 8.5); R-08 added; `genisoimage` removed | Claude |
+| 0.21    | 2026-10-15 | Step 8: Helm chart and generated manifests implemented (DEP-001 to DEP-008); verified in a kind cluster (`scripts/kind-test.sh`) | Claude |
+| 0.20    | 2026-10-15 | DEP-003 changed by the product owner: bundled CouchDB as own StatefulSet (1 replica, PVC) instead of the Apache CouchDB subchart; generated credentials stable across upgrades. Chart default image `ghcr.io/alirionx/cloudinit-nocloud-configurator:main` (pullPolicy Always) | Daniel Quilitzsch |
 | 0.19    | 2026-10-15 | DS-008 implemented: `compose.yaml` (CouchDB + app built on start, hardened like in Kubernetes) | Claude |
 | 0.18    | 2026-10-15 | Clarifications of v0.17 confirmed by the product owner: FQDN with `manage_etc_hosts: localhost` (FR-005), numeric `fs_setup` partitions with filtered schema false positive (FR-012, R-09), SSH defaults always rendered (FR-011), hostname optional single label (FR-005), `lock_passwd` default on (FR-010), Vuetify (7.2), app starts while CouchDB is unreachable (DS-005/DS-006), additional API endpoints (FR-015) | Daniel Quilitzsch |
 | 0.17    | 2026-10-15 | Implementation clarifications from steps 1–7 recorded (FR-005, FR-006, FR-008, FR-010 to FR-015, NFR-008, section 7.2, R-09); FR-001 to FR-016 marked as implemented; DS-003 and NFR-008 implemented in the MVP | Claude |
@@ -481,14 +483,14 @@ There are two delivery paths (OQ-05):
 
 | ID      | Requirement | Priority |
 |---------|-------------|----------|
-| DEP-001 | The manifests contain at least namespace, deployment, service, ConfigMap and probes (NFR-004). Default setup: **TinyDB on a PersistentVolumeClaim with 1 replica** and update strategy `Recreate` (R-02). | Must |
-| DEP-002 | The Helm chart allows choosing the datastore (`tinydb` or `couchdb`) and sets the environment variables from section 8.3 accordingly. | Must |
-| DEP-003 | In the Helm chart, CouchDB can either be **installed alongside** (optional dependency, e.g. the official Apache CouchDB chart, via `couchdb.enabled`) or connected as an **external instance** via URL. | Must |
-| DEP-004 | CouchDB credentials come from a Kubernetes Secret; an existing Secret can be referenced (`existingSecret`); passwords never appear in plain text in `values.yaml` examples. | Must |
-| DEP-005 | The Helm chart prevents more than one replica with `tinydb` (template validation with a clear error message). | Must |
-| DEP-006 | The Helm chart optionally supports Ingress (including annotations for upstream authentication, e.g. Basic Auth or OAuth2 Proxy), resource limits, SecurityContext (non-root, read-only root filesystem, NFR-002), labels/annotations and image tag. | Should |
-| DEP-007 | The manifests are generated from the Helm chart with default values (`helm template`) so both paths do not drift apart; a CI check ensures the committed manifests are up to date. | Should |
-| DEP-008 | The Helm chart is checked with `helm lint`. | Should |
+| DEP-001 | The manifests contain at least namespace, deployment, service, ConfigMap and probes (NFR-004). Default setup: **TinyDB on a PersistentVolumeClaim with 1 replica** and update strategy `Recreate` (R-02). _Implemented (v0.21): `deploy/k8s/`._ | Must |
+| DEP-002 | The Helm chart allows choosing the datastore (`tinydb` or `couchdb`) and sets the environment variables from section 8.3 accordingly. _Implemented (v0.21)._ | Must |
+| DEP-003 | In the Helm chart, CouchDB can either be **installed alongside** (via `couchdb.enabled`) or connected as an **external instance** via URL. _Changed in v0.20:_ no subchart ("Helm in Helm"); the chart contains its own single-node CouchDB as a **StatefulSet with 1 replica** and a PersistentVolumeClaim (official `couchdb` image). If no `existingSecret` is given, the chart generates the credentials once and keeps them stable across upgrades. _Implemented (v0.21)._ | Must |
+| DEP-004 | CouchDB credentials come from a Kubernetes Secret; an existing Secret can be referenced (`existingSecret`); passwords never appear in plain text in `values.yaml` examples. _Implemented (v0.21): external CouchDB requires `existingSecret`._ | Must |
+| DEP-005 | The Helm chart prevents more than one replica with `tinydb` (template validation with a clear error message). _Implemented (v0.21)._ | Must |
+| DEP-006 | The Helm chart optionally supports Ingress (including annotations for upstream authentication, e.g. Basic Auth or OAuth2 Proxy), resource limits, SecurityContext (non-root, read-only root filesystem, NFR-002), labels/annotations and image tag. _Implemented (v0.21)._ | Should |
+| DEP-007 | The manifests are generated from the Helm chart with default values (`helm template`) so both paths do not drift apart; a CI check ensures the committed manifests are up to date. _Implemented (v0.21): `deploy/generate-manifests.sh --check` in CI._ | Should |
+| DEP-008 | The Helm chart is checked with `helm lint`. _Implemented (v0.21): `helm lint --strict` in CI._ | Should |
 
 ### 8.5 Selection of Libraries and Tools
 

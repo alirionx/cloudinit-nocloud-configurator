@@ -1,0 +1,46 @@
+# Checks the Helm chart (DEP-008) and that the plain manifests in deploy/k8s are generated
+# from the current chart (DEP-007, R-07).
+name: Helm chart
+
+on:
+  push:
+    branches: [main]
+    paths: ["deploy/**", ".github/workflows/helm.yml"]
+  pull_request:
+    paths: ["deploy/**", ".github/workflows/helm.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      CHART: deploy/helm/cloudinit-nocloud-configurator
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v3.19.0
+
+      - name: Lint (default, CouchDB alongside, external CouchDB, Ingress)
+        run: |
+          helm lint "$CHART" --strict
+          helm lint "$CHART" --strict --set couchdb.enabled=true --set replicaCount=2
+          helm lint "$CHART" --strict --set datastore.backend=couchdb \
+            --set datastore.couchdb.url=http://couchdb:5984 --set datastore.couchdb.existingSecret=couchdb
+          helm lint "$CHART" --strict --set ingress.enabled=true
+
+      - name: TinyDB with more than one replica is rejected (DEP-005)
+        run: |
+          if helm template test "$CHART" --set replicaCount=2 >/dev/null 2>&1; then
+            echo "replicaCount=2 with TinyDB was accepted" >&2
+            exit 1
+          fi
+
+      - name: Generated manifests are up to date (DEP-007)
+        run: deploy/generate-manifests.sh --check

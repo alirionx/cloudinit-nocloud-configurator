@@ -1,0 +1,124 @@
+{{- include "cnc.validate" . }}
+{{- $backend := include "cnc.backend" . }}
+{{- $tinydb := .Values.datastore.tinydb.persistence }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cnc.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cnc.labels" . | nindent 4 }}
+    {{- include "cnc.selectorLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    {{- if eq $backend "tinydb" }}
+    # TinyDB: never two pods on the same database file (DEP-001, R-02).
+    type: Recreate
+    {{- else }}
+    type: RollingUpdate
+    {{- end }}
+  selector:
+    matchLabels:
+      {{- include "cnc.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cnc.labels" . | nindent 8 }}
+        {{- include "cnc.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "cnc.fullname" . }}
+          {{- if eq $backend "couchdb" }}
+          env:
+            - name: COUCHDB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cnc.couchdbSecretName" . }}
+                  key: {{ ternary "username" .Values.datastore.couchdb.usernameKey .Values.couchdb.enabled }}
+            - name: COUCHDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cnc.couchdbSecretName" . }}
+                  key: {{ ternary "password" .Values.datastore.couchdb.passwordKey .Values.couchdb.enabled }}
+          {{- end }}
+          # Probes (NFR-004): readiness includes the datastore (DS-006).
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            # Seed images are built here during a request only (NFR-005).
+            - name: tmp
+              mountPath: /tmp
+            {{- if eq $backend "tinydb" }}
+            - name: data
+              mountPath: /app/data
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.tmpSizeLimit }}
+        {{- if eq $backend "tinydb" }}
+        - name: data
+          {{- if not $tinydb.enabled }}
+          emptyDir: {}
+          {{- else }}
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-data" (include "cnc.fullname" .)) $tinydb.existingClaim }}
+          {{- end }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,122 @@
+{{- if .Values.couchdb.enabled }}
+{{- $c := .Values.couchdb }}
+# CouchDB installed alongside the app (DEP-003): one pod with its own volume.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "cnc.couchdbName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cnc.labels" . | nindent 4 }}
+    {{- include "cnc.couchdbSelectorLabels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "cnc.couchdbName" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "cnc.couchdbSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cnc.labels" . | nindent 8 }}
+        {{- include "cnc.couchdbSelectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/couchdb-configmap.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml $c.podSecurityContext | nindent 8 }}
+      containers:
+        - name: couchdb
+          image: "{{ $c.image.repository }}:{{ $c.image.tag }}"
+          imagePullPolicy: {{ $c.image.pullPolicy }}
+          securityContext:
+            {{- toYaml $c.securityContext | nindent 12 }}
+          ports:
+            - name: couchdb
+              containerPort: 5984
+              protocol: TCP
+          env:
+            # Erlang sizes its port table by the open-files limit; with containerd's very
+            # high default the VM allocates more than 1 GiB at startup and is OOM-killed.
+            - name: ERL_FLAGS
+              value: "+Q 65536"
+            - name: COUCHDB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cnc.couchdbSecretName" . }}
+                  key: username
+            - name: COUCHDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cnc.couchdbSecretName" . }}
+                  key: password
+            - name: COUCHDB_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cnc.couchdbSecretName" . }}
+                  key: cookieSecret
+          startupProbe:
+            httpGet:
+              path: /_up
+              port: couchdb
+            periodSeconds: 2
+            failureThreshold: 60
+          livenessProbe:
+            httpGet:
+              path: /_up
+              port: couchdb
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /_up
+              port: couchdb
+            periodSeconds: 5
+          resources:
+            {{- toYaml $c.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /opt/couchdb/data
+            # The image writes its runtime config (admin, generated UUID) here.
+            - name: local-d
+              mountPath: /opt/couchdb/etc/local.d
+            - name: config
+              mountPath: /opt/couchdb/etc/local.d/10-single-node.ini
+              subPath: 10-single-node.ini
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: local-d
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: {{ include "cnc.couchdbName" . }}
+      {{- with $c.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $c.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $c.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "cnc.couchdbSelectorLabels" . | nindent 10 }}
+      spec:
+        accessModes:
+          {{- toYaml $c.persistence.accessModes | nindent 10 }}
+        {{- with $c.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $c.persistence.size }}
+{{- end }}

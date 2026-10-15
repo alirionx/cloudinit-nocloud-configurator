@@ -92,7 +92,9 @@ distributed with the application.
 | openssl | SHA-512-crypt password hashing via `openssl passwd -6` (FR-010) | Apache-2.0 | Alpine repository (OpenSSL project) |
 | `debian:stable` | Tests only: manual validation with the `cloud-init schema` CLI | Various (DFSG) | Docker Official Images |
 | Debian 13 genericcloud image, QEMU, OVMF | Tests only: `scripts/boot-test.sh` (FR-002); not part of the app | Various (DFSG), GPL-2.0, BSD-2-Clause-Patent | Debian, QEMU, TianoCore |
-| `couchdb:3` | Tests only: contract tests and smoke test (DS-007); not part of the app image | Apache-2.0 | Docker Official Images (Apache CouchDB) |
+| `couchdb:3` | Tests (contract tests, smoke test, compose); `couchdb:3.5` is deployed by the Helm chart when `couchdb.enabled=true` (DEP-003) | Apache-2.0 | Docker Official Images (Apache CouchDB) |
+| kind | Tests only: `scripts/kind-test.sh` (throwaway Kubernetes cluster) | Apache-2.0 | Kubernetes SIGs |
+| Helm | Chart, manifest generation (DEP-007), lint (DEP-008) | Apache-2.0 | CNCF |
 | xorriso | ISO 9660 seed image (FR-002) | GPL-3.0-or-later | Alpine repository (GNU xorriso) |
 | dosfstools | `mkfs.vfat` for RAW seed images (FR-002) | GPL-3.0-or-later | Alpine repository |
 | mtools | Copy files into VFAT images without mounting (FR-002, NFR-002) | GPL-3.0-or-later | Alpine repository (GNU mtools) |
@@ -111,6 +113,7 @@ application itself stays MIT-licensed (LIB-001, NFR-017).
 | docker/login-action | Log in to ghcr.io with the workflow token | Apache-2.0 | Docker |
 | docker/metadata-action | Image tags (`main`, `sha-<commit>`) and OCI labels | Apache-2.0 | Docker |
 | docker/build-push-action | Build and push the image | Apache-2.0 | Docker |
+| azure/setup-helm | Install Helm for chart checks | MIT | Microsoft (Azure) |
 
 ## Documented exceptions
 

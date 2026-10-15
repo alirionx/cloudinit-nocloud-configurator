@@ -1,0 +1,19 @@
+{{- $backend := include "cnc.backend" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cnc.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cnc.labels" . | nindent 4 }}
+    {{- include "cnc.selectorLabels" . | nindent 4 }}
+data:
+  # Configuration via environment variables (NFR-003, section 8.3).
+  DATASTORE_BACKEND: {{ $backend | quote }}
+  LOG_LEVEL: {{ .Values.logLevel | quote }}
+  {{- if eq $backend "tinydb" }}
+  TINYDB_PATH: "/app/data/db.json"
+  {{- else }}
+  COUCHDB_URL: {{ include "cnc.couchdbUrl" . | quote }}
+  COUCHDB_DATABASE: {{ ternary .Values.couchdb.database .Values.datastore.couchdb.database .Values.couchdb.enabled | quote }}
+  {{- end }}

@@ -1,0 +1,16 @@
+cloudinit-nocloud-configurator is installed.
+
+Datastore: {{ include "cnc.backend" . }}{{ if .Values.couchdb.enabled }} (CouchDB installed alongside as StatefulSet {{ include "cnc.couchdbName" . }}){{ end }}
+{{- if .Values.ingress.enabled }}
+
+Open: {{ range .Values.ingress.hosts }}http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}/ {{ end }}
+{{- else }}
+
+Open the app locally:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "cnc.fullname" . }} 8080:{{ .Values.service.port }}
+  then http://localhost:8080 (API docs: http://localhost:8080/docs)
+{{- end }}
+{{- if eq (include "cnc.backend" .) "tinydb" }}
+
+TinyDB stores all data in one file; run exactly one replica (R-02). For more replicas use CouchDB.
+{{- end }}

@@ -92,8 +92,18 @@ docker compose up --build        # app on :8080, CouchDB/Fauxton on 127.0.0.1:59
 docker compose down -v           # stop and delete the CouchDB data
 ```
 
+Kubernetes (see `deploy/README.md`):
+
+```sh
+helm lint deploy/helm/cloudinit-nocloud-configurator --strict
+deploy/generate-manifests.sh           # regenerate deploy/k8s after every chart change (DEP-007)
+deploy/generate-manifests.sh --check   # verify deploy/k8s is up to date
+scripts/kind-test.sh                   # all variants in a throwaway kind cluster (needs kind, helm, kubectl)
+```
+
 CI: `.github/workflows/docker-image.yml` builds the image on every push to `main` and pushes
-`ghcr.io/alirionx/cloudinit-nocloud-configurator:main` (plus `:sha-<commit>`).
+`ghcr.io/alirionx/cloudinit-nocloud-configurator:main` (plus `:sha-<commit>`);
+`.github/workflows/helm.yml` lints the chart and checks the generated manifests.
 
 Acceptance test with a real VM (FR-002): boots the Debian 13 cloud image with seeds in all three
 formats (QEMU/KVM + OVMF, sudo if not in group kvm) and checks what cloud-init applied:

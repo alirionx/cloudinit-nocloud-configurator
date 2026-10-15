@@ -1,0 +1,20 @@
+{{- $p := .Values.datastore.tinydb.persistence }}
+{{- if and (eq (include "cnc.backend" .) "tinydb") $p.enabled (not $p.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "cnc.fullname" . }}-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cnc.labels" . | nindent 4 }}
+    {{- include "cnc.selectorLabels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml $p.accessModes | nindent 4 }}
+  {{- with $p.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $p.size }}
+{{- end }}

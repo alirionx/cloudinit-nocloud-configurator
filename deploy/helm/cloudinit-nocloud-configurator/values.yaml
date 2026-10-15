@@ -1,0 +1,140 @@
+# Default values for cloudinit-nocloud-configurator (section 8.4 of docs/requirements.md).
+# The defaults give a working single-instance setup: TinyDB on a PersistentVolumeClaim.
+
+# -- Number of app replicas. Only 1 is allowed with TinyDB (DEP-005, R-02).
+replicaCount: 1
+
+image:
+  repository: ghcr.io/alirionx/cloudinit-nocloud-configurator
+  # -- Image tag. `main` is built on every push to main.
+  tag: main
+  pullPolicy: Always
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# -- Create the Namespace object (used for the generated plain manifests in deploy/k8s).
+# With `helm install --create-namespace` leave this false.
+namespace:
+  create: false
+
+# -- Log level of the app: debug, info, warning, error, critical.
+logLevel: info
+
+datastore:
+  # -- `tinydb` (default, single instance) or `couchdb` (external instance, see below).
+  # Ignored when `couchdb.enabled` is true: the bundled CouchDB is used then.
+  backend: tinydb
+
+  tinydb:
+    persistence:
+      # -- Without persistence, data is lost when the pod restarts.
+      enabled: true
+      size: 1Gi
+      storageClass: ""
+      accessModes: [ReadWriteOnce]
+      # -- Use an existing PersistentVolumeClaim instead of creating one.
+      existingClaim: ""
+
+  # -- External CouchDB (datastore.backend=couchdb, couchdb.enabled=false).
+  couchdb:
+    # -- URL of the CouchDB server, e.g. http://couchdb.databases.svc:5984
+    url: ""
+    database: cloudinit
+    # -- Secret with the credentials (required for an external CouchDB, DEP-004).
+    existingSecret: ""
+    usernameKey: username
+    passwordKey: password
+
+# -- CouchDB installed alongside the app (DEP-003): a single-node StatefulSet.
+couchdb:
+  enabled: false
+  image:
+    repository: couchdb
+    tag: "3.5"
+    pullPolicy: IfNotPresent
+  database: cloudinit
+  # -- Admin user name (the password is generated, see existingSecret).
+  username: admin
+  # -- Secret with keys `username`, `password` and `cookieSecret`. If empty, the chart
+  # generates one with a random password that stays stable across upgrades.
+  existingSecret: ""
+  persistence:
+    size: 2Gi
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 5984
+    runAsGroup: 5984
+    fsGroup: 5984
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ALL]
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+ingress:
+  enabled: false
+  # -- e.g. nginx or traefik
+  className: ""
+  # -- Annotations, e.g. for upstream authentication (Basic Auth, OAuth2 Proxy), DEP-006.
+  annotations: {}
+  hosts:
+    - host: cloudinit.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: cloudinit-tls
+  #    hosts: [cloudinit.example.com]
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+# -- Size limit of /tmp, where seed images are built during a request (NFR-005).
+tmpSizeLimit: 512Mi
+
+# -- Pod and container security (NFR-002, DEP-006): non-root, read-only root filesystem.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+# -- Labels added to all resources.
+commonLabels: {}
+podAnnotations: {}
+podLabels: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
