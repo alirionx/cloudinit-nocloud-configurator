@@ -74,14 +74,15 @@ function onBlur() {
 </script>
 
 <template>
-  <div class="tag-input">
+  <div class="tag-input" :class="{ 'has-chips': model.length > 0 }">
     <v-text-field
       :id="field.id"
       :model-value="text"
       :label="label"
       :hint="hint"
       :persistent-hint="!!hint"
-      :placeholder="placeholder"
+      :placeholder="model.length ? undefined : placeholder"
+      :active="model.length > 0 || undefined"
       :error-messages="errorMessages"
       :messages="field.messages"
       :class="field.class"
@@ -94,7 +95,7 @@ function onBlur() {
       @blur="onBlur"
     >
       <template v-if="model.length" #prepend-inner>
-        <div class="d-flex flex-wrap ga-1 py-1 chips">
+        <div class="d-flex flex-wrap ga-1 pt-2 chips">
           <v-chip
             v-for="(value, index) in model"
             :key="value"
@@ -113,10 +114,25 @@ function onBlur() {
 </template>
 
 <style scoped>
-.chips {
-  max-width: 70%;
+/* Chips get a full-width row of their own (wrapping, never cut off); the text input
+   follows below, and the label floats above the border. */
+.tag-input.has-chips :deep(.v-field) {
+  grid-template-areas:
+    'prepend-inner prepend-inner prepend-inner prepend-inner'
+    'field field clear append-inner';
 }
 .tag-input :deep(.v-field__prepend-inner) {
   align-items: center;
+  padding-top: 0;
+}
+.tag-input.has-chips :deep(.v-field__input) {
+  min-height: 36px;
+  padding-top: 4px;
+}
+.chips {
+  min-width: 0;
+}
+.chips :deep(.v-chip) {
+  max-width: 100%;
 }
 </style>
