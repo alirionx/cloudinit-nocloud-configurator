@@ -55,6 +55,13 @@ Debian 13), used under Apache-2.0 (cloud-init is dual-licensed GPL-3 / Apache-2.
 | @codemirror/theme-one-dark | Dark editor theme (FR-016) | MIT | CodeMirror |
 | swagger-ui-dist | Swagger UI for /docs, served locally instead of from a CDN (NFR-010, NFR-012); copied to `dist/swagger/` at build time | Apache-2.0 | SmartBear (swagger-api) |
 
+Telemetry opt-out (NFR-012): `swagger-ui-dist` depends on `@scarf/scarf`, whose install script
+reports package installations to scarf.sh. It is disabled twice in `frontend/package.json`:
+`allowScripts` denies the install script (npm ≥ 11.20 asks before running install scripts) and
+`scarfSettings.enabled: false` is scarf's own opt-out for older npm versions.
+
+
+
 Notes on the selection:
 
 - **PrimeVue was rejected:** since version 5 PrimeVue, PrimeIcons and @primeuix/themes are
@@ -89,7 +96,7 @@ distributed with the application.
 | Component | Purpose | License | Source |
 |-----------|---------|---------|--------|
 | `python:3.13-alpine` | Runtime base image | PSF-2.0 (Python), MIT (Alpine base) | Docker Official Images |
-| `node:24-alpine` | Frontend build stage only, not in the final image | MIT | Docker Official Images |
+| `node:26-alpine` | Frontend build stage only, not in the final image (Node 26 LTS from 2026-10-28, supported until 2029-04-30) | MIT | Docker Official Images |
 | openssl | SHA-512-crypt password hashing via `openssl passwd -6` (FR-010) | Apache-2.0 | Alpine repository (OpenSSL project) |
 | `debian:stable` | Tests only: manual validation with the `cloud-init schema` CLI | Various (DFSG) | Docker Official Images |
 | Debian 13 genericcloud image, QEMU, OVMF | Tests only: `scripts/boot-test.sh` (FR-002); not part of the app | Various (DFSG), GPL-2.0, BSD-2-Clause-Patent | Debian, QEMU, TianoCore |

@@ -65,7 +65,7 @@ STATIC_DIR=../frontend/dist uv run python -m app      # also serve the built fro
 uv add <pkg>                               # new dependency -> also update docs/dependencies.md
 ```
 
-Frontend (Node 24), run in `frontend/`:
+Frontend (Node 26, see `engines` in package.json), run in `frontend/`:
 
 ```sh
 npm ci                # install from package-lock.json

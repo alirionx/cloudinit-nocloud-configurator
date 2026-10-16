@@ -179,7 +179,7 @@ All dependencies are open source and actively maintained; see
 ### Prerequisites
 
 - Python 3.13 and [uv](https://docs.astral.sh/uv/) (`uv` can install Python 3.13 for you)
-- Node.js 24
+- Node.js 26 (e.g. `nvm install 26`)
 - For seed images and password hashing:
   `sudo apt install xorriso mtools dosfstools qemu-utils openssl` (Debian/Ubuntu)
 - Docker (optional): container build, CouchDB tests, Compose stack
