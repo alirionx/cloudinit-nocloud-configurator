@@ -23,8 +23,24 @@ configuration by hand is tedious and error-prone:
 - building the seed image needs tools like `xorriso`, `mtools` or `qemu-img`.
 
 This app turns that into a form with validation at every field, shows the resulting YAML while
-you type and builds the seed image for you. It targets **Debian** as the guest OS and anyone who
-provisions VMs on Proxmox, KVM/libvirt, VMware or bare metal.
+you type and builds the seed image for you. It is meant for anyone who provisions VMs on Proxmox,
+KVM/libvirt, VMware or bare metal.
+
+### Guest operating systems
+
+The app **focuses on Debian**: defaults, hints and the end-to-end boot test (Debian 13
+`genericcloud`) are aligned with it. Most settings use distribution-independent cloud-init
+modules, so the generated seeds also work with other cloud images that ship cloud-init, such as
+Ubuntu, Rocky Linux or AlmaLinux. Three things are Debian-specific:
+
+| Setting | On Debian/Ubuntu | On RHEL-like systems (Rocky, Alma, …) |
+|---|---|---|
+| "Administrator" checkbox | Adds the user to the group `sudo` | `sudo` grants nothing there: add the group `wheel` instead, or use the sudo rule field, which works everywhere |
+| Package names | Debian repository names (e.g. `docker.io`) | Use the names of the distribution's repositories; `package_update`/`package_upgrade` work with dnf as well |
+| Warning "group does not exist" | Knows the Debian standard groups | May warn about groups that exist on the guest anyway; the warning does not block saving |
+
+Network settings are written as Netplan v2, which cloud-init translates for the guest
+(e.g. NetworkManager on Rocky Linux). Only Debian is tested regularly.
 
 ## Features
 
