@@ -19,9 +19,15 @@
 
 {{/* Labels */}}
 {{- define "cnc.labels" -}}
+{{- if .Values.generatedManifests }}
+{{- /* Plain manifests are applied with kubectl, not managed by Helm (DEP-001). */}}
+app.kubernetes.io/part-of: {{ include "cnc.name" . }}
+app.kubernetes.io/managed-by: kubectl
+{{- else }}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 app.kubernetes.io/part-of: {{ include "cnc.name" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
 {{- with .Values.commonLabels }}
 {{ toYaml . }}
 {{- end }}

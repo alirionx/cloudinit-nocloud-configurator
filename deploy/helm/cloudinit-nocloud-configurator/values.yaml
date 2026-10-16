@@ -19,6 +19,10 @@ fullnameOverride: ""
 namespace:
   create: false
 
+# -- Set by deploy/generate-manifests.sh only: render labels for plain manifests applied
+# with kubectl (`managed-by: kubectl`, no Helm labels). Leave false for Helm installs.
+generatedManifests: false
+
 # -- Log level of the app: debug, info, warning, error, critical.
 logLevel: info
 

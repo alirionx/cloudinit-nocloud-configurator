@@ -4,7 +4,8 @@
 #   scripts/kind-test.sh
 #
 # Scenarios:
-#   1. Plain manifests (deploy/k8s): TinyDB on a PVC; data survives a pod restart.
+#   1. Plain manifests, TinyDB variant (deploy/k8s/tinydb): data survives a pod restart.
+#   1b. Plain manifests, CouchDB variant (deploy/k8s/couchdb) with a pre-created Secret.
 #   2. Helm chart with CouchDB installed alongside and 2 app replicas; the generated
 #      password survives `helm upgrade`, CouchDB data survives a pod restart.
 #   3. Helm chart with an external CouchDB (existingSecret).
@@ -74,14 +75,22 @@ IMAGE_SET=(--set "image.repository=$IMAGE_REPOSITORY" --set "image.tag=$IMAGE_TA
 [ "${LOAD_LOCAL_IMAGE:-0}" = 1 ] && IMAGE_SET+=(--set image.pullPolicy=IfNotPresent)
 
 # --- 1. Plain manifests ---
-log "1. Plain manifests (TinyDB on PVC)"
+log "1. Plain manifests, TinyDB variant"
 NS=cloudinit-nocloud-configurator
-if [ "$IMAGE_REPOSITORY:$IMAGE_TAG" = "ghcr.io/alirionx/cloudinit-nocloud-configurator:main" ]; then
-  kubectl apply -f deploy/k8s/ >/dev/null
-else
-  helm template "$NS" "$CHART" --namespace "$NS" --set namespace.create=true "${IMAGE_SET[@]}" \
-    | kubectl apply -f - >/dev/null
-fi
+# apply_manifests <variant>: the committed manifests, or rendered the same way with a custom image.
+apply_manifests() {
+  if [ "$IMAGE_REPOSITORY:$IMAGE_TAG" = "ghcr.io/alirionx/cloudinit-nocloud-configurator:main" ]; then
+    kubectl apply -f "deploy/k8s/$1/" >/dev/null
+  else
+    local extra=()
+    [ "$1" = couchdb ] && extra=(--set couchdb.enabled=true --set couchdb.existingSecret="$NS-couchdb" --set replicaCount=2)
+    helm template "$NS" "$CHART" --namespace "$NS" --set namespace.create=true --set generatedManifests=true \
+      "${extra[@]}" "${IMAGE_SET[@]}" | kubectl apply -f - >/dev/null
+  fi
+}
+apply_manifests tinydb
+[ "$(kubectl -n "$NS" get deploy "$NS" -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}')" = kubectl ] \
+  || fail "manifests should be labelled managed-by: kubectl"
 kubectl -n "$NS" rollout status deploy/"$NS" --timeout=180s >/dev/null
 port_forward "$NS" "$NS" 18081
 id="$(create_config 18081 manifests)"
@@ -91,6 +100,21 @@ kubectl -n "$NS" rollout status deploy/"$NS" --timeout=180s >/dev/null
 port_forward "$NS" "$NS" 18081
 assert_config 18081 "$id"
 echo "    ok: data survived the pod restart (PVC), image download works"
+kubectl delete namespace "$NS" --wait >/dev/null
+
+# --- 1b. Plain manifests, CouchDB variant ---
+log "1b. Plain manifests, CouchDB variant (Secret created first)"
+kubectl create namespace "$NS" >/dev/null
+kubectl -n "$NS" create secret generic "$NS-couchdb" --from-literal=username=admin \
+  --from-literal=password="$(openssl rand -hex 24)" --from-literal=cookieSecret="$(openssl rand -hex 24)" >/dev/null
+apply_manifests couchdb
+kubectl -n "$NS" rollout status statefulset/"$NS-couchdb" --timeout=180s >/dev/null
+kubectl -n "$NS" rollout status deploy/"$NS" --timeout=180s >/dev/null
+[ "$(kubectl -n "$NS" get deploy "$NS" -o jsonpath='{.status.readyReplicas}')" = 2 ] || fail "expected 2 ready replicas"
+port_forward "$NS" "$NS" 18084
+id="$(create_config 18084 manifests-couchdb)"
+assert_config 18084 "$id"
+echo "    ok: CouchDB variant with 2 replicas, image download works"
 kubectl delete namespace "$NS" --wait >/dev/null
 
 # --- 2. Helm chart with CouchDB installed alongside ---

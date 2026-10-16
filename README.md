@@ -87,19 +87,22 @@ is available on <http://localhost:5984/_utils> from the local machine only.
 
 ### Kubernetes
 
-Plain manifests (TinyDB on a PersistentVolumeClaim, one replica):
+Plain manifests, variant TinyDB (one replica, PersistentVolumeClaim):
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/alirionx/cloudinit-nocloud-configurator/main/deploy/k8s/cloudinit-nocloud-configurator.yaml
+kubectl apply -f https://raw.githubusercontent.com/alirionx/cloudinit-nocloud-configurator/main/deploy/k8s/tinydb/cloudinit-nocloud-configurator.yaml
 kubectl -n cloudinit-nocloud-configurator port-forward svc/cloudinit-nocloud-configurator 8080:80
 ```
+
+A second variant with CouchDB and two replicas is in `deploy/k8s/couchdb/`; it needs a Secret
+with the CouchDB credentials first (see [deploy/README.md](deploy/README.md#plain-manifests)).
 
 Helm chart from a [release](https://github.com/alirionx/cloudinit-nocloud-configurator/releases),
 here with CouchDB installed alongside and two app replicas:
 
 ```sh
 helm install cnc \
-  https://github.com/alirionx/cloudinit-nocloud-configurator/releases/download/chart-v0.1.0/cloudinit-nocloud-configurator-0.1.0.tgz \
+  https://github.com/alirionx/cloudinit-nocloud-configurator/releases/download/chart-v0.1.1/cloudinit-nocloud-configurator-0.1.1.tgz \
   -n cloudinit --create-namespace \
   --set couchdb.enabled=true --set replicaCount=2
 ```

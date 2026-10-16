@@ -2,7 +2,7 @@ apiVersion: v2
 name: cloudinit-nocloud-configurator
 description: Web app to build cloud-init NoCloud seed drives (ISO / RAW / QCOW2) from a guided form with live YAML preview.
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "main"
 license: MIT
 home: https://github.com/alirionx/cloudinit-nocloud-configurator

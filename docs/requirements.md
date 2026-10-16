@@ -1,7 +1,7 @@
 # Requirements Specification: cloudinit-nocloud-configurator
 
 > **Status:** MVP implemented (steps 1–8)
-> **Version:** 0.23
+> **Version:** 0.24
 > **Last updated:** 2026-10-15
 > **Owner:** Daniel Quilitzsch
 
@@ -26,6 +26,7 @@
 | 0.13    | 2026-10-15 | App name set: cloudinit-nocloud-configurator | Claude |
 | 0.14    | 2026-10-15 | OQ-09 decided: Debian as target OS of the VMs; FR-007, FR-010, assumptions and R-06 updated | Claude |
 | 0.15    | 2026-10-15 | Problem statement (1.2) refined; NFR-015/NFR-016 on established, actively maintained open-source libraries added (criteria in 8.5); R-08 added; `genisoimage` removed | Claude |
+| 0.24    | 2026-10-16 | DEP-001 changed by the product owner: plain manifests in two variants (TinyDB, CouchDB); CouchDB variant uses a pre-created Secret; generated manifests no longer carry Helm labels | Daniel Quilitzsch |
 | 0.23    | 2026-10-15 | FR-016 changed by the product owner: dark theme is the default; visual refresh (sidebar navigation, teal/salmon accents, rounded cards, font Inter) in 7.2 | Daniel Quilitzsch |
 | 0.22    | 2026-10-15 | DEP-009 (Helm chart as GitHub release artifact, version from `Chart.yaml`, image tag `main`) and DEP-010 (container image on ghcr.io, already implemented) added; R-10 added | Claude |
 | 0.21    | 2026-10-15 | Step 8: Helm chart and generated manifests implemented (DEP-001 to DEP-008); verified in a kind cluster (`scripts/kind-test.sh`) | Claude |
@@ -486,7 +487,7 @@ There are two delivery paths (OQ-05):
 
 | ID      | Requirement | Priority |
 |---------|-------------|----------|
-| DEP-001 | The manifests contain at least namespace, deployment, service, ConfigMap and probes (NFR-004). Default setup: **TinyDB on a PersistentVolumeClaim with 1 replica** and update strategy `Recreate` (R-02). _Implemented (v0.21): `deploy/k8s/`._ | Must |
+| DEP-001 | The manifests contain at least namespace, deployment, service, ConfigMap and probes (NFR-004). Default setup: **TinyDB on a PersistentVolumeClaim with 1 replica** and update strategy `Recreate` (R-02). _Changed in v0.24:_ the manifests come in **two variants**: `deploy/k8s/tinydb/` (default setup as above) and `deploy/k8s/couchdb/` (CouchDB StatefulSet as in DEP-003, two app replicas, strategy RollingUpdate). The CouchDB variant contains no credentials: a Secret is created beforehand (documented command). Generated manifests are labelled `app.kubernetes.io/managed-by: kubectl` (no Helm labels), because they are not managed by Helm. _Implemented (v0.24)._ | Must |
 | DEP-002 | The Helm chart allows choosing the datastore (`tinydb` or `couchdb`) and sets the environment variables from section 8.3 accordingly. _Implemented (v0.21)._ | Must |
 | DEP-003 | In the Helm chart, CouchDB can either be **installed alongside** (via `couchdb.enabled`) or connected as an **external instance** via URL. _Changed in v0.20:_ no subchart ("Helm in Helm"); the chart contains its own single-node CouchDB as a **StatefulSet with 1 replica** and a PersistentVolumeClaim (official `couchdb` image). If no `existingSecret` is given, the chart generates the credentials once and keeps them stable across upgrades. _Implemented (v0.21)._ | Must |
 | DEP-004 | CouchDB credentials come from a Kubernetes Secret; an existing Secret can be referenced (`existingSecret`); passwords never appear in plain text in `values.yaml` examples. _Implemented (v0.21): external CouchDB requires `existingSecret`._ | Must |

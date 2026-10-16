@@ -12,15 +12,37 @@ The containers run as non-root with a read-only root filesystem and need no spec
 
 ## Plain manifests
 
+Two variants, both in the namespace `cloudinit-nocloud-configurator`:
+
+**TinyDB** (`deploy/k8s/tinydb/`): a Deployment with one replica (strategy `Recreate`), a Service,
+a ConfigMap and a 1 GiB PersistentVolumeClaim for the TinyDB file.
+
 ```sh
-kubectl apply -f deploy/k8s/
+kubectl apply -f deploy/k8s/tinydb/
+```
+
+**CouchDB** (`deploy/k8s/couchdb/`): a single-node CouchDB StatefulSet with its own volume and
+two app replicas. The manifests contain no credentials; create the Secret first:
+
+```sh
+kubectl create namespace cloudinit-nocloud-configurator
+kubectl -n cloudinit-nocloud-configurator create secret generic cloudinit-nocloud-configurator-couchdb \
+  --from-literal=username=admin \
+  --from-literal=password="$(openssl rand -hex 24)" \
+  --from-literal=cookieSecret="$(openssl rand -hex 24)"
+kubectl apply -f deploy/k8s/couchdb/
+```
+
+Then open the app:
+
+```sh
 kubectl -n cloudinit-nocloud-configurator port-forward svc/cloudinit-nocloud-configurator 8080:80
 # http://localhost:8080   (API docs: /docs)
 ```
 
-This creates the namespace `cloudinit-nocloud-configurator`, a Deployment with one replica
-(strategy `Recreate`), a Service, a ConfigMap and a 1 GiB PersistentVolumeClaim for the TinyDB
-file. The manifests are generated from the Helm chart; do not edit them by hand (see below).
+The manifests are generated from the Helm chart and labelled `app.kubernetes.io/managed-by: kubectl`;
+do not edit them by hand (see below). They cannot be taken over by `helm install` later: to switch
+to Helm, delete the namespace (or the resources) and install the chart.
 
 ## Helm chart
 
@@ -28,7 +50,7 @@ From a GitHub release (DEP-009), without cloning the repository:
 
 ```sh
 helm install cnc \
-  https://github.com/alirionx/cloudinit-nocloud-configurator/releases/download/chart-v0.1.0/cloudinit-nocloud-configurator-0.1.0.tgz \
+  https://github.com/alirionx/cloudinit-nocloud-configurator/releases/download/chart-v0.1.1/cloudinit-nocloud-configurator-0.1.1.tgz \
   -n cloudinit --create-namespace
 ```
 
@@ -123,7 +145,7 @@ changes, bump `version` in `Chart.yaml` (semantic versioning) in the same commit
 
 ## Maintaining the manifests
 
-The manifests in `deploy/k8s/` are rendered from the chart with default values:
+The manifests in `deploy/k8s/tinydb/` and `deploy/k8s/couchdb/` are rendered from the chart:
 
 ```sh
 deploy/generate-manifests.sh          # after every chart change; commit the result
