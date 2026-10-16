@@ -9,6 +9,7 @@ import {
   HardDrive,
   KeyRound,
   Network as NetworkIcon,
+  Pencil,
   Package,
   RotateCcw,
   Save,
@@ -16,7 +17,7 @@ import {
   SquareTerminal,
   Users as UsersIcon,
 } from '@lucide/vue'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError, type ImageFormat, api } from '../api/client'
 import type { Configuration, FileName, ItemTemplates, StoredConfiguration, YamlError } from '../api/types'
@@ -137,7 +138,18 @@ function setLoaded(config: StoredConfiguration | null) {
   form.value = config ? toConfiguration(config) : clone(newConfiguration.value!)
   savedSnapshot.value = config ? JSON.stringify(form.value) : ''
   autoInstanceId.value = !config
-  if (!config) form.value.basics.instance_id = suggestInstanceId(null, instanceIdSuffix)
+  if (!config) {
+    form.value.basics.instance_id = suggestInstanceId(null, instanceIdSuffix)
+    // FR-015: a new configuration starts with its name selected, so typing replaces it.
+    void nextTick(() => focusName(true))
+  }
+}
+
+/** Focus the name field; `select` marks the whole name so typing replaces it. */
+function focusName(select = false) {
+  const input = document.getElementById('field-name') as HTMLInputElement | null
+  input?.focus()
+  if (select) input?.select()
 }
 
 async function load() {
@@ -316,7 +328,18 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
           class="name-field"
           hide-details="auto"
           v-bind="nameField"
-        />
+        >
+          <template #append-inner>
+            <v-btn
+              :icon="Pencil"
+              variant="text"
+              size="small"
+              aria-label="Rename configuration"
+              title="Rename"
+              @click="focusName(true)"
+            />
+          </template>
+        </v-text-field>
         <v-chip v-if="dirty" color="warning" variant="tonal" size="small">Unsaved changes</v-chip>
         <v-spacer />
         <v-btn v-if="dirty && stored" variant="text" :prepend-icon="RotateCcw" @click="revertPrompt = true">
@@ -603,5 +626,22 @@ const FORMATS: { value: ImageFormat; title: string; subtitle: string }[] = [
   font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+/* The title is editable: dashed underline on hover, accent underline while editing. */
+.name-field :deep(.v-field__input) {
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+.name-field:hover :deep(.v-field__input) {
+  border-bottom-color: rgba(var(--v-theme-on-surface), 0.35);
+  border-bottom-style: dashed;
+}
+.name-field :deep(.v-field--focused .v-field__input) {
+  border-bottom-color: rgb(var(--v-theme-primary));
+  border-bottom-style: solid;
+}
+.name-field :deep(.v-field__append-inner) {
+  align-items: center;
+  opacity: 0.7;
 }
 </style>

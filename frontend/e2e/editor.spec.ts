@@ -135,3 +135,24 @@ test('FR-013: the downloaded image is built from the same YAML as the preview', 
   const files = await (await request.get(`/api/configurations/${config.id}/files`)).json()
   expect(shown.trim()).toBe(files['meta-data'].trim())
 })
+
+test('FR-015: a new configuration starts with its name selected for editing', async ({ page }) => {
+  await page.goto('/configurations/new')
+  const name = page.getByLabel('Configuration name')
+  await expect(name).toBeFocused()
+  await page.keyboard.type('web-42')
+  await expect(name).toHaveValue('web-42')
+})
+
+test('FR-015: the pencil next to the title focuses the name field', async ({ page, request }) => {
+  const config = await createConfiguration(request, { name: uniqueName('Pencil') })
+  await page.goto(`/configurations/${config.id}`)
+  await expect(page.getByLabel('Configuration name')).toHaveValue(config.name)
+  await page.getByRole('button', { name: 'Rename configuration' }).click()
+  await expect(page.getByLabel('Configuration name')).toBeFocused()
+  await page.keyboard.type('renamed-in-editor')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText('Unsaved changes')).toBeHidden()
+  const stored = await (await request.get(`/api/configurations/${config.id}`)).json()
+  expect(stored.name).toBe('renamed-in-editor')
+})
